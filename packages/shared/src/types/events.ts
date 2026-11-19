@@ -1,0 +1,12 @@
+export const OUTBOX_EVENT_TYPES = [
+  "NOTIFY_ABSENTEE_PARENTS",
+  "COMPUTE_PAYROLL",
+  "DISPATCH_PAYROLL",
+  "SEND_RECEIPT",
+  "SEND_NOTICE",
+  "GENERATE_PDF",
+  "RECONCILE_PAYMENTS",
+  "ALERT",
+] as const;
+
+export type OutboxEventType = typeof OUTBOX_EVENT_TYPES[number];

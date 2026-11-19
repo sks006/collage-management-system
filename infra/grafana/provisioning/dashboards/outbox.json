@@ -1,0 +1,15 @@
+{
+  "title": "SMS Outbox Queue Metrics",
+  "panels": [
+    {
+      "title": "Pending Outbox Jobs",
+      "type": "stat",
+      "targets": [{ "expr": "sms_outbox_pending_count" }]
+    },
+    {
+      "title": "Dead-Letter Jobs",
+      "type": "stat",
+      "targets": [{ "expr": "sms_outbox_dead_count" }]
+    }
+  ]
+}

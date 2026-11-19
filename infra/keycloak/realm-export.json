@@ -1,0 +1,39 @@
+{
+  "id": "sms",
+  "realm": "sms",
+  "enabled": true,
+  "registrationAllowed": false,
+  "resetPasswordAllowed": true,
+  "rememberMe": true,
+  "roles": {
+    "realm": [
+      { "name": "ADMIN", "description": "Administrator / Principal" },
+      { "name": "PRINCIPAL", "description": "School Principal" },
+      { "name": "TEACHER", "description": "Teaching Faculty" },
+      { "name": "OFFICE", "description": "Office and Admin Staff" },
+      { "name": "FINANCE", "description": "Finance and Billing Officer" },
+      { "name": "STUDENT", "description": "Enrolled Student" },
+      { "name": "PARENT", "description": "Guardian / Parent" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "sms-api",
+      "name": "SMS API Backend",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "bearerOnly": true
+    },
+    {
+      "clientId": "sms-web",
+      "name": "SMS Next.js Web App",
+      "enabled": true,
+      "publicClient": true,
+      "protocol": "openid-connect",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "redirectUris": ["http://localhost:3000/*", "http://localhost:3000/api/auth/callback"],
+      "webOrigins": ["http://localhost:3000"]
+    }
+  ]
+}

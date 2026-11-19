@@ -1,0 +1,34 @@
+{
+  "name": "sms-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "pnpm@9.12.0",
+  "scripts": {
+    "dev": "nx run-many --target=dev --all --parallel=3",
+    "dev:api": "nx dev @sms/api",
+    "dev:web": "nx dev @sms/web",
+    "dev:worker": "nx dev @sms/worker",
+    "build": "nx run-many --target=build --all",
+    "test": "nx run-many --target=test --all",
+    "lint": "nx run-many --target=lint --all",
+    "db:generate": "pnpm --filter @sms/database db:generate",
+    "db:migrate": "pnpm --filter @sms/database db:migrate",
+    "db:studio": "pnpm --filter @sms/database db:studio"
+  },
+  "devDependencies": {
+    "@nx/devkit": "^20.0.0",
+    "@nx/enforce-module-boundaries": "^20.0.0",
+    "@nx/eslint": "^20.0.0",
+    "@nx/eslint-plugin": "^20.0.0",
+    "@nx/js": "^20.0.0",
+    "@nx/next": "^20.0.0",
+    "@nx/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.15.0",
+    "@typescript-eslint/parser": "^8.15.0",
+    "eslint": "^9.15.0",
+    "eslint-config-prettier": "^9.1.0",
+    "nx": "^20.0.0",
+    "prettier": "^3.3.3",
+    "typescript": "^5.7.2"
+  }
+}
