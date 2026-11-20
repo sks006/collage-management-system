@@ -1,14 +1,18 @@
-import { Injectable, Inject } from "@nestjs/common";
-import { DATABASE_CONNECTION } from "../../../shared/database/database.provider";
+import { Injectable } from "@nestjs/common";
 import { DatabaseInstance, academicYear, term, classTable, section, subject, teacherSection } from "@sms/database";
-import { eq, desc } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 
 @Injectable()
 export class AcademicRepository {
-  constructor(@Inject(DATABASE_CONNECTION) private db: DatabaseInstance) {}
+  constructor(private db: DatabaseInstance) {}
 
   async findYears() {
-    return this.db.select().from(academicYear).orderBy(desc(academicYear.startDate));
+    return this.db.select().from(academicYear).orderBy(academicYear.startDate);
+  }
+
+  async findById(id: string) {
+    const [row] = await this.db.select().from(academicYear).where(eq(academicYear.id, id));
+    return row;
   }
 
   async createYear(data: typeof academicYear.$inferInsert) {
@@ -17,7 +21,7 @@ export class AcademicRepository {
   }
 
   async findTerms(yearId: string) {
-    return this.db.select().from(term).where(eq(term.academicYearId, yearId));
+    return this.db.select().from(term).where(eq(term.academicYearId, yearId)).orderBy(term.sequence);
   }
 
   async createTerm(data: typeof term.$inferInsert) {
@@ -43,12 +47,17 @@ export class AcademicRepository {
     return row;
   }
 
-  async assignTeacher(data: typeof teacherSection.$inferInsert) {
-    const [row] = await this.db.insert(teacherSection).values(data).returning();
+  async findSubjects(classId: string) {
+    return this.db.select().from(subject).where(eq(subject.classId, classId));
+  }
+
+  async createSubject(data: typeof subject.$inferInsert) {
+    const [row] = await this.db.insert(subject).values(data).returning();
     return row;
   }
 
-  async findTeacherSections(staffId: string) {
-    return this.db.select().from(teacherSection).where(eq(teacherSection.staffId, staffId));
+  async assignTeacher(data: typeof teacherSection.$inferInsert) {
+    const [row] = await this.db.insert(teacherSection).values(data).returning();
+    return row;
   }
 }

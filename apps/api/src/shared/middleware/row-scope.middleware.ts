@@ -1,8 +1,9 @@
-import { Injectable, NestMiddleware, Inject } from '@nestjs/common';
-import { Request, Response, NextFunction } from 'express';
-import { eq } from 'drizzle-orm';
-// Adjust schema imports to match your @sms/database exports
-import { DRIZZLE_DB } from '../database/database.provider';
+import { Injectable, NestMiddleware } from '@nestjs/common';
+import { FastifyRequest, FastifyReply } from 'fastify';
+import { Inject } from '@nestjs/common';
+import { DATABASE_CONNECTION } from '../database/database.provider';
+import { DatabaseInstance, staff, teacherSection, student, enrollment } from '@sms/database';
+import { eq, and } from 'drizzle-orm';
 
 export interface RowScope {
   role: string;
@@ -14,13 +15,8 @@ export interface RowScope {
 }
 
 declare global {
-  namespace Express {
-    interface Request {
-      user?: {
-        sub: string;
-        email?: string;
-        roles: string[];
-      };
+  namespace FastifyRequest {
+    interface FastifyRequest {
       rowScope?: RowScope;
     }
   }
@@ -28,26 +24,26 @@ declare global {
 
 @Injectable()
 export class RowScopeMiddleware implements NestMiddleware {
-  constructor(@Inject(DRIZZLE_DB) private readonly db: any) {}
+  constructor(@Inject(DATABASE_CONNECTION) private readonly db: DatabaseInstance) {}
 
-  async use(req: Request, _res: Response, next: NextFunction) {
-    const user = req.user;
+  async use(req: FastifyRequest, _res: FastifyReply, next: () => void) {
+    const user = (req as any).user;
     if (!user) {
       return next();
     }
 
-    const roles = user.roles || [];
+    const roles: string[] = user.roles || [];
 
-    // Admin, Principal, Office, and Finance have institution-wide scope
+    // Admin, Principal, Office, Finance: institution-wide scope
     if (
       roles.includes('ADMIN') ||
       roles.includes('PRINCIPAL') ||
       roles.includes('OFFICE') ||
       roles.includes('FINANCE')
     ) {
-      req.rowScope = {
+      (req as any).rowScope = {
         role: roles[0],
-        userId: user.sub,
+        userId: user.id,
         unrestricted: true,
       };
       return next();
@@ -55,21 +51,15 @@ export class RowScopeMiddleware implements NestMiddleware {
 
     // Teacher: restrict to assigned sections
     if (roles.includes('TEACHER')) {
-      const staff = await this.db.query.staff?.findFirst({
-        where: (s: any, { eq }: any) => eq(s.keycloakUserId, user.sub),
-      });
-
-      const assignments = staff
-        ? await this.db.query.teacherAssignments?.findMany({
-            where: (ta: any, { eq }: any) => eq(ta.staffId, staff.id),
-          })
+      const [staffRow] = await this.db.select().from(staff).where(eq(staff.keycloakUserId, user.id)).limit(1);
+      const assignments = staffRow
+        ? await this.db.select().from(teacherSection).where(eq(teacherSection.staffId, staffRow.id))
         : [];
-
-      req.rowScope = {
+      (req as any).rowScope = {
         role: 'TEACHER',
-        userId: user.sub,
-        staffId: staff?.id,
-        sectionIds: assignments.map((a: any) => a.sectionId),
+        userId: user.id,
+        staffId: staffRow?.id,
+        sectionIds: assignments.map((a: typeof teacherSection.$inferSelect) => a.sectionId),
         unrestricted: false,
       };
       return next();
@@ -77,15 +67,25 @@ export class RowScopeMiddleware implements NestMiddleware {
 
     // Student / Parent: restrict to own or linked student records
     if (roles.includes('STUDENT') || roles.includes('PARENT')) {
-      const students = await this.db.query.students?.findMany({
-        where: (st: any, { eq, or }: any) =>
-          or(eq(st.keycloakUserId, user.sub), eq(st.guardianKeycloakId, user.sub)),
-      });
+      const rows = await this.db
+        .select()
+        .from(student)
+        .where(eq(student.keycloakUserId, user.id))
+        .limit(1);
 
-      req.rowScope = {
+      // For PARENT, look up via guardianKeycloakId
+      let studentIds: string[] = [];
+      if (roles.includes('STUDENT') && rows.length > 0) {
+        studentIds = [rows[0].id];
+      } else if (roles.includes('PARENT')) {
+        const linked = await this.db.select().from(student).where(eq(student.guardianKeycloakId, user.id));
+        studentIds = linked.map((s) => s.id);
+      }
+
+      (req as any).rowScope = {
         role: roles.includes('STUDENT') ? 'STUDENT' : 'PARENT',
-        userId: user.sub,
-        studentIds: (students || []).map((s: any) => s.id),
+        userId: user.id,
+        studentIds,
         unrestricted: false,
       };
       return next();

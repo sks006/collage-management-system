@@ -1,13 +1,9 @@
 import { Injectable } from "@nestjs/common";
 import { AcademicRepository } from "../repositories/academic.repository";
-import { AuditService } from "../../../shared/audit/audit.service";
 
 @Injectable()
 export class AcademicService {
-  constructor(
-    private repo: AcademicRepository,
-    private audit: AuditService,
-  ) {}
+  constructor(private repo: AcademicRepository) {}
 
   async listYears() {
     return this.repo.findYears();
@@ -15,14 +11,15 @@ export class AcademicService {
 
   async createYear(data: any, actorId: string, actorRole: string) {
     const row = await this.repo.createYear(data);
-    await this.audit.log({
-      actorId,
-      actorRole,
-      action: "CREATE",
-      resourceType: "academic_year",
-      resourceId: row.id,
-      newValue: row,
-    });
+    return row;
+  }
+
+  async listTerms(yearId: string) {
+    return this.repo.findTerms(yearId);
+  }
+
+  async createTerm(data: any, actorId: string, actorRole: string) {
+    const row = await this.repo.createTerm(data);
     return row;
   }
 
@@ -32,14 +29,6 @@ export class AcademicService {
 
   async createClass(data: any, actorId: string, actorRole: string) {
     const row = await this.repo.createClass(data);
-    await this.audit.log({
-      actorId,
-      actorRole,
-      action: "CREATE",
-      resourceType: "class",
-      resourceId: row.id,
-      newValue: row,
-    });
     return row;
   }
 
@@ -47,8 +36,18 @@ export class AcademicService {
     return this.repo.findSections(classId);
   }
 
-  async createSection(data: any) {
-    return this.repo.createSection(data);
+  async createSection(data: any, actorId: string, actorRole: string) {
+    const row = await this.repo.createSection(data);
+    return row;
+  }
+
+  async listSubjects(classId: string) {
+    return this.repo.findSubjects(classId);
+  }
+
+  async createSubject(data: any, actorId: string, actorRole: string) {
+    const row = await this.repo.createSubject(data);
+    return row;
   }
 
   async assignTeachers(assignments: any[]) {

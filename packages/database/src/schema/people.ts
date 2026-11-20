@@ -17,6 +17,8 @@ export const student = peopleSchema.table("student", {
   guardianName: text("guardian_name").notNull(),
   guardianPhone: text("guardian_phone").notNull(),
   guardianEmail: text("guardian_email"),
+  guardianKeycloakId: text("guardian_keycloak_id"),
+  keycloakUserId: text("keycloak_user_id"),
   photoUrl: text("photo_url"),
   status: text("status").default("ACTIVE").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -24,6 +26,8 @@ export const student = peopleSchema.table("student", {
 }, (t) => ({
   nameEnIdx: index("student_name_en_trgm_idx").on(t.nameEn),
   nameBnIdx: index("student_name_bn_trgm_idx").on(t.nameBn),
+  keycloakUserIdIdx: index("student_keycloak_user_id_idx").on(t.keycloakUserId),
+  guardianKeycloakIdIdx: index("student_guardian_keycloak_id_idx").on(t.guardianKeycloakId),
 }));
 
 export const staff = peopleSchema.table("staff", {
@@ -42,12 +46,14 @@ export const staff = peopleSchema.table("staff", {
   bankAccountNo: text("bank_account_no"),
   bankName: text("bank_name"),
   bankBranch: text("bank_branch"),
+  keycloakUserId: text("keycloak_user_id"),
   photoUrl: text("photo_url"),
   status: text("status").default("ACTIVE").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => ({
   nameEnIdx: index("staff_name_en_trgm_idx").on(t.nameEn),
+  keycloakUserIdIdx: index("staff_keycloak_user_id_idx").on(t.keycloakUserId),
 }));
 
 export const enrollment = peopleSchema.table("enrollment", {

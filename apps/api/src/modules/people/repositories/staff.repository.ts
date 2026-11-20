@@ -10,11 +10,7 @@ export class StaffRepository {
   async findMany(limit = 50, q?: string) {
     if (q) {
       return this.db.select().from(staff).where(
-        or(
-          ilike(staff.employeeNo, `%${q}%`),
-          ilike(staff.nameEn, `%${q}%`),
-          ilike(staff.email, `%${q}%`),
-        )
+        ilike(staff.nameEn, `%${q}%`),
       ).limit(limit);
     }
     return this.db.select().from(staff).limit(limit);
@@ -22,6 +18,11 @@ export class StaffRepository {
 
   async findById(id: string) {
     const [row] = await this.db.select().from(staff).where(eq(staff.id, id));
+    return row;
+  }
+
+  async findByKeycloakId(keycloakUserId: string) {
+    const [row] = await this.db.select().from(staff).where(eq(staff.keycloakUserId, keycloakUserId));
     return row;
   }
 

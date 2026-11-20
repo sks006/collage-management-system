@@ -1,6 +1,6 @@
 import { Controller, Get, UseGuards } from "@nestjs/common";
 import { ApiTags, ApiBearerAuth, ApiOperation } from "@nestjs/swagger";
-import { LedgerRepository } from "../repositories/ledger.repository";
+import { LedgerService } from "../services/ledger.service";
 import { JwtAuthGuard } from "../../../shared/guards/jwt.guard";
 import { RolesGuard } from "../../../shared/guards/roles.guard";
 import { Roles } from "../../../shared/decorators/roles.decorator";
@@ -10,12 +10,12 @@ import { Roles } from "../../../shared/decorators/roles.decorator";
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller("finance/ledger")
 export class LedgerController {
-  constructor(private repo: LedgerRepository) {}
+  constructor(private service: LedgerService) {}
 
   @Get()
   @Roles("FINANCE", "ADMIN", "PRINCIPAL")
   @ApiOperation({ summary: "Inspect append-only financial ledger" })
   async getLedgerEntries() {
-    return this.repo.findEntries();
+    return this.service.getLedgerEntries();
   }
 }

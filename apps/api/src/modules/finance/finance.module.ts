@@ -4,6 +4,7 @@ import { InvoiceController } from "./controllers/invoice.controller";
 import { LedgerController } from "./controllers/ledger.controller";
 import { PaymentService } from "./services/payment.service";
 import { InvoiceService } from "./services/invoice.service";
+import { LedgerService } from "./services/ledger.service";
 import { PaymentRepository } from "./repositories/payment.repository";
 import { InvoiceRepository } from "./repositories/invoice.repository";
 import { LedgerRepository } from "./repositories/ledger.repository";
@@ -13,10 +14,11 @@ import { LedgerRepository } from "./repositories/ledger.repository";
   providers: [
     PaymentService,
     InvoiceService,
+    LedgerService,
     PaymentRepository,
     InvoiceRepository,
     LedgerRepository,
   ],
-  exports: [PaymentService, InvoiceService, LedgerRepository],
+  exports: [PaymentService, InvoiceService, LedgerService],
 })
 export class FinanceModule {}

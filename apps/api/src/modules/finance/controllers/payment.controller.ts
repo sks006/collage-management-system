@@ -1,15 +1,20 @@
 import { Controller, Post, Body, Headers, UseGuards } from "@nestjs/common";
-import { ApiTags, ApiOperation } from "@nestjs/swagger";
+import { ApiTags, ApiBearerAuth, ApiOperation } from "@nestjs/swagger";
 import { PaymentService } from "../services/payment.service";
+import { JwtAuthGuard } from "../../../shared/guards/jwt.guard";
+import { RolesGuard } from "../../../shared/guards/roles.guard";
 import { ZodValidationPipe } from "../../../shared/pipes/zod-validation.pipe";
 import { initiatePaymentSchema, ipnWebhookSchema } from "@sms/shared";
 
 @ApiTags("Finance: Payments")
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller("finance/payments")
 export class PaymentController {
   constructor(private service: PaymentService) {}
 
   @Post("initiate")
+  @Roles("ADMIN", "OFFICE", "FINANCE")
   @ApiOperation({ summary: "Initiate fee payment via aggregator" })
   async initiatePayment(
     @Body(new ZodValidationPipe(initiatePaymentSchema)) dto: any,

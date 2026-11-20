@@ -1,7 +1,7 @@
 import { Injectable, Inject } from "@nestjs/common";
 import { DATABASE_CONNECTION } from "../../../shared/database/database.provider";
-import { DatabaseInstance, payment } from "@sms/database";
-import { eq } from "drizzle-orm";
+import { DatabaseInstance, payment, invoice } from "@sms/database";
+import { eq, desc } from "drizzle-orm";
 
 @Injectable()
 export class PaymentRepository {
@@ -18,20 +18,24 @@ export class PaymentRepository {
     return row;
   }
 
+  async findByInvoiceId(invoiceId: string) {
+    return this.db.select().from(payment).where(eq(payment.invoiceId, invoiceId));
+  }
+
   async findByIdempotencyKey(key: string) {
     const [row] = await this.db.select().from(payment).where(eq(payment.idempotencyKey, key));
     return row;
   }
 
-  async updateStatus(id: string, status: string, payload?: any, tx?: any) {
+  async findByStatus(status: string, limit = 100) {
+    return this.db.select().from(payment).where(eq(payment.status, status)).limit(limit);
+  }
+
+  async updateStatus(id: string, status: string, validatedAt?: Date, tx?: any) {
     const client = tx || this.db;
     const [row] = await client
       .update(payment)
-      .set({
-        status,
-        ipnPayload: payload || undefined,
-        validatedAt: new Date(),
-      })
+      .set({ status, validatedAt: validatedAt || new Date() })
       .where(eq(payment.id, id))
       .returning();
     return row;
