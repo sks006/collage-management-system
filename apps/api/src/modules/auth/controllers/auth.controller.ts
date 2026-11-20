@@ -1,24 +1,32 @@
-import { Controller, Get, Post, UseGuards } from "@nestjs/common";
-import { ApiTags, ApiBearerAuth, ApiOperation } from "@nestjs/swagger";
-import { JwtAuthGuard } from "../../../shared/guards/jwt.guard";
-import { CurrentUser, AuthenticatedUser } from "../../../shared/decorators/current-user.decorator";
+import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
+import { Request } from 'express';
+import { AuthService, ProvisionUserDto } from '../services/auth.service';
+import { JwtGuard } from '../../../shared/guards/jwt.guard';
+import { RolesGuard } from '../../../shared/guards/roles.guard';
+import { Roles } from '../../../shared/decorators/roles.decorator';
 
-@ApiTags("Auth")
-@Controller("auth")
+@Controller('auth')
+@UseGuards(JwtGuard, RolesGuard)
 export class AuthController {
-  @Get("me")
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: "Get currently authenticated user identity and roles" })
-  async getMe(@CurrentUser() user: AuthenticatedUser) {
-    return user;
+  constructor(private readonly authService: AuthService) {}
+
+  @Get('me')
+  getProfile(@Req() req: Request) {
+    return {
+      user: req.user,
+      scope: req.rowScope,
+    };
   }
 
-  @Post("logout")
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: "Logout user session" })
-  async logout() {
-    return { message: "Logged out successfully" };
+  @Post('provision')
+  @Roles('ADMIN')
+  provisionSingle(@Body() dto: ProvisionUserDto) {
+    return this.authService.provisionUser(dto);
+  }
+
+  @Post('provision/bulk')
+  @Roles('ADMIN')
+  provisionBulk(@Body() body: { users: ProvisionUserDto[] }) {
+    return this.authService.bulkProvisionUsers(body.users);
   }
 }
