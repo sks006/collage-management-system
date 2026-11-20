@@ -1,4 +1,7 @@
-.PHONY: up down dev dev-api dev-web dev-worker db-migrate db-generate test lint build clean
+.PHONY: install up down dev dev-api dev-web dev-worker db-migrate db-generate test lint build clean
+
+install:
+	pnpm install
 
 up:
 	docker compose up -d

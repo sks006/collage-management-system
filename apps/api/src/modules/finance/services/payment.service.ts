@@ -4,7 +4,8 @@ import { InvoiceRepository } from "../repositories/invoice.repository";
 import { LedgerRepository } from "../repositories/ledger.repository";
 import { OutboxService } from "../../../shared/outbox/outbox.service";
 import { DATABASE_CONNECTION } from "../../../shared/database/database.provider";
-import { DatabaseInstance } from "@sms/database";
+import { DatabaseInstance, payment } from "@sms/database";
+import { eq } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
 @Injectable()
@@ -62,10 +63,14 @@ export class PaymentService {
     return this.db.transaction(async (tx) => {
       if (isMatched) {
         // Step A: Update payment status to PROCESSED
-        const [updatedPay] = await tx
-          .insert(paymentRepoProxy(tx))
-          .values({})
-          .returning(); // Mock proxy
+        await tx
+          .update(payment)
+          .set({
+            status: "PROCESSED",
+            validatedAt: new Date(),
+            ipnPayload: payload,
+          })
+          .where(eq(payment.aggregatorTranId, tranId));
 
         // Step B: Post to append-only ledger
         await this.ledgerRepo.recordEntry({
@@ -92,8 +97,4 @@ export class PaymentService {
       }
     });
   }
-}
-
-function paymentRepoProxy(tx: any): any {
-  return {};
 }
