@@ -1,6 +1,6 @@
 # 📁 The Total Project Layout (Modular Monorepo)
 
-**Version:** 2.1 (Canonical Repository Specification)
+**Version:** 2.2 (Canonical Repository Specification)
 **Architecture:** Nx Modular Monolith (`@nx/enforce-module-boundaries`)
 
 ```text
@@ -13,7 +13,7 @@ sms-monorepo/
 │   ├── database/                # Shared Drizzle ORM Schemas & Hand-Written SQL Migrations
 │   └── shared/                  # Shared Zod Validation Schemas & TypeScript Contracts
 ├── infra/                       # Docker, Postgres init, Keycloak realm, Prometheus & Grafana
-├── docs/                        # Master Project Outline, Layout, Modules & Feature Checklist
+├── docs/                        # Master Project Outline, Layout, Modules, Features & RBAC Matrix
 ├── docker-compose.yml           # Local Infrastructure Stack
 ├── Makefile                     # Developer & Operations Shortcuts
 ├── nx.json                      # Nx Workspace & Module Boundary Rules
@@ -140,7 +140,7 @@ apps/web/src/
 ├── app/
 │   ├── (auth)/
 │   │   └── login/
-│   │       └── page.tsx                     # Keycloak OIDC / Google Workspace login entry
+│   │       └── page.tsx                     # Keycloak OIDC / Google Workspace login & 302 role redirect
 │   ├── (dashboard)/
 │   │   ├── academic/
 │   │   │   └── page.tsx                     # Academic years, terms, classes, sections, subjects
@@ -160,7 +160,7 @@ apps/web/src/
 │   │   │   └── page.tsx                     # Staff directory & Keycloak provisioning
 │   │   ├── students/
 │   │   │   └── page.tsx                     # Student directory, CSV import & enrollment
-│   │   ├── layout.tsx                       # Auth shield + Sidebar & Navbar shell
+│   │   ├── layout.tsx                       # Auth shield + canAccessPath guard + Sidebar/Navbar shell
 │   │   └── page.tsx                         # Role-aware dashboard home
 │   ├── globals.css
 │   └── layout.tsx
@@ -170,11 +170,12 @@ apps/web/src/
 ├── components/
 │   ├── shared/
 │   │   ├── navbar.tsx
-│   │   └── sidebar.tsx
+│   │   └── sidebar.tsx                      # Role-filtered navigation sidebar
 │   └── ui/                                  # shadcn/ui primitives (badge, button, card, etc.)
 └── lib/
     ├── api-client.ts                        # Typed fetch wrapper injecting Bearer JWT & Request-ID
-    ├── auth.ts                              # HTTP-only cookie session & Keycloak helpers
+    ├── auth.ts                              # HTTP-only cookie session & Keycloak JWT decoder
+    ├── rbac.ts                              # Role landing map, sidebar filter & route access guard
     └── utils.ts
 ```
 
@@ -245,13 +246,15 @@ infra/
 
 ---
 
-## 🔄 5. End-to-End Request & Outbox Flow
+## 🔄 5. End-to-End Authentication, Request & Outbox Flow
 
 ```mermaid
 sequenceDiagram
     autonumber
     actor User
-    participant View as Next.js View<br/>(React Component)
+    participant Login as Next.js Login<br/>((auth)/login)
+    participant KC as Keycloak
+    participant View as Next.js View<br/>((dashboard)/layout)
     participant NextAction as Next.js Action<br/>(Server Action)
     participant ApiCtrl as NestJS Controller<br/>(Fastify)
     participant Service as Domain Service<br/>(Business Model)
@@ -259,7 +262,11 @@ sequenceDiagram
     participant DB as PostgreSQL
     participant Worker as Outbox Worker
 
-    User->>View: Submits Action (e.g. Mark Attendance)
+    User->>Login: Authenticates via Institutional ID / Google
+    Login->>KC: Exchanges OIDC Auth Code for JWT
+    KC-->>Login: Returns JWT (realm_access.roles)
+    Login-->>User: Sets HTTP-only cookie + 302 Redirect to DEFAULT_LANDING_ROUTE
+    User->>View: Loads Role-Filtered Dashboard & Sidebar
     View->>NextAction: Calls Server Action
     NextAction->>ApiCtrl: POST /api/v1/attendance/batch<br/>(Bearer JWT + X-Request-ID)
     Note over ApiCtrl: JwtGuard (jose) -> RolesGuard -> RowScope -> ZodPipe

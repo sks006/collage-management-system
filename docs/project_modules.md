@@ -28,18 +28,18 @@ The system is built as a **Modular Monolith**. Every module owns its PostgreSQL 
 ---
 
 ## 1. Identity & Access (`auth`)
-* **Purpose:** Authenticate users via self-hosted Keycloak (OIDC + Google Workspace OAuth), validate stateless JWTs, enforce the 7 RBAC roles, and attach row-level data scopes.
+* **Purpose:** Authenticate users via self-hosted Keycloak (OIDC + Google Workspace OAuth), validate stateless JWTs, enforce the 7 RBAC roles, route users immediately to their role-specific default landing view, and attach row-level data scopes.
 * **Key Entities:** Users and roles live in Keycloak (`infra/keycloak/realm-export.json`); linked via `keycloak_user_id` on `people.staff` and `people.student`.
-* **Files:** `apps/api/src/modules/auth/*`, `apps/api/src/shared/guards/{jwt,roles}.guard.ts`, `apps/api/src/shared/middleware/request-id.middleware.ts`, `apps/web/src/lib/auth.ts`.
+* **Files:** `apps/api/src/modules/auth/*`, `apps/api/src/shared/guards/{jwt,roles}.guard.ts`, `apps/api/src/shared/middleware/request-id.middleware.ts`, `apps/web/src/lib/{auth,rbac}.ts`, `apps/web/src/app/(auth)/login/page.tsx`, `apps/web/src/app/(dashboard)/layout.tsx`.
 
 **Checklist:**
 - [x] Keycloak realm export created (`infra/keycloak/realm-export.json`) with the 7 canonical roles: `ADMIN`, `PRINCIPAL`, `TEACHER`, `OFFICE`, `FINANCE`, `STUDENT`, `PARENT`.
 - [x] Custom NestJS `JwtGuard` (`jose` JWKS verification) and `RolesGuard` scaffolded.
+- [x] Frontend OIDC code-exchange callback, HTTP-only cookie storage, `DEFAULT_LANDING_ROUTE` `302` redirect, and `(dashboard)/layout.tsx` `canAccessPath` route guard implemented (`docs/rbac_and_frontend_matrix.md`).
 - [ ] Configure Google/Gmail Identity Brokering and SMTP password-reset flows in Keycloak.
 - [ ] Enforce mandatory MFA for `ADMIN`, `PRINCIPAL`, and `FINANCE` roles.
 - [ ] Implement bulk Keycloak Admin REST API provisioning in `auth.service.ts` (20k accounts).
 - [ ] Complete `RowScope` middleware attachment (`TEACHER` -> `sectionIds`, `STUDENT`/`PARENT` -> `studentIds`).
-- [ ] Wire Next.js HTTP-only cookie auth shield in `apps/web/src/app/(dashboard)/layout.tsx`.
 
 ---
 
@@ -80,13 +80,13 @@ The system is built as a **Modular Monolith**. Every module owns its PostgreSQL 
 * **Dependencies:** `academic`, `people`.
 
 **Checklist:**
-- [x] Drizzle schema `packages/database/src/schema/attendance.ts` and `attendance.actions.ts` created.
+- [x] Drizzle schema `packages/database/src/schema/attendance.ts`, `attendance.actions.ts`, and `AttendanceService` implemented.
 - [x] NestJS `attendance` controller, service, and repository scaffolded.
 - [ ] Add hand-written SQL migration for `attendance.period_event` monthly range partitioning + 60-day ahead partition scheduler job.
 - [ ] Create `attendance.daily_summary` Materialized View with unique index for concurrent refresh.
-- [ ] Implement atomic `POST /api/v1/attendance/batch` (40 rows < 100ms) + outbox `NOTIFY_ABSENTEE_PARENTS` (deduped).
-- [ ] Implement VLAN-scoped `POST /api/v1/attendance/device` with per-device HMAC signature verification.
-- [ ] Implement correction request workflow (Teacher submits -> Admin/Principal approves -> Audit logged).
+- [ ] Wire `POST /api/v1/attendance/batch` (40 rows < 100ms) + outbox `NOTIFY_ABSENTEE_PARENTS` (deduped) to `/attendance` roster UI.
+- [ ] Wire VLAN-scoped `POST /api/v1/attendance/device` with per-device HMAC signature verification.
+- [ ] Wire correction request workflow (Teacher submits -> Admin/Principal approves -> Audit logged) to UI.
 - [ ] Load test 500 concurrent teachers at p95 < 500ms.
 
 ---
@@ -111,9 +111,9 @@ The system is built as a **Modular Monolith**. Every module owns its PostgreSQL 
 * **Dependencies:** `attendance`, `leave`.
 
 **Checklist:**
-- [x] `period-close.controller.ts`, `period-close.service.ts`, `period-close.repository.ts`, and `/attendance/period-close/page.tsx` scaffolded.
-- [ ] Implement summary aggregation combining `period_event`, approved `leave_request`, and `calendar_day`.
-- [ ] Enforce DB `CHECK (approved_by IS NULL OR approved_by <> submitted_by)` Maker-Checker constraint.
+- [x] `period-close.controller.ts`, `period-close.service.ts`, `period-close.repository.ts`, and `/attendance/period-close/page.tsx` implemented/scaffolded.
+- [ ] Include approved `leave_request` and `calendar_day` exclusions in `PeriodCloseService` summary aggregation.
+- [ ] Enforce DB `CHECK (approved_by IS NULL OR approved_by <> submitted_by)` Maker-Checker constraint via SQL migration.
 - [ ] Enforce DB role isolation: revoke `SELECT` on `attendance.period_event` from `sms_payroll_reader`; grant `SELECT` only on `attendance.period_close` (`status IN ('APPROVED', 'LOCKED')`).
 - [ ] Implement post-close adjustment flow that posts deltas to the next open period without mutating locked snapshots.
 
@@ -125,13 +125,12 @@ The system is built as a **Modular Monolith**. Every module owns its PostgreSQL 
 * **Dependencies:** `people`, `academic`.
 
 **Checklist:**
-- [x] Drizzle schema `packages/database/src/schema/finance.ts`, `finance` API module (`invoice`, `ledger`, `payment`), `payment.actions.ts`, and `/finance` page scaffolded.
+- [x] Drizzle schema `packages/database/src/schema/finance.ts`, `finance` API module (`invoice`, `ledger`, `payment`), `PaymentService`, `payment.actions.ts`, and `/finance` page implemented/scaffolded.
 - [ ] Enforce append-only triggers & grants on `finance.ledger_entry` (forbid `UPDATE`/`DELETE`; allow only offsetting `reversal_of` rows).
-- [ ] Implement background bulk invoice generator (20k invoices in < 10 min via chunked outbox jobs).
-- [ ] Implement `POST /api/v1/finance/payments/initiate` (with `Idempotency-Key`) and IPN webhook handler (signature check + aggregator validation API + amount/currency/tran_id match).
+- [ ] Implement background bulk invoice generator worker handler (`BULK_GENERATE_INVOICES`, 20k invoices in < 10 min).
 - [ ] Complete `payment-reconcile.processor.ts` for 5-minute stale payment polling and daily 02:00 settlement reconciliation.
 - [ ] Complete `pdf-generation.processor.ts` to upload PDF receipts to Cloudflare R2 and trigger deduped SMS links.
-- [ ] Implement Maker-Checker waivers/scholarships (`POST /api/v1/finance/waivers`).
+- [ ] Wire Maker-Checker waivers/scholarships (`POST /api/v1/finance/waivers`) to `/finance` UI.
 
 ---
 
@@ -156,10 +155,10 @@ The system is built as a **Modular Monolith**. Every module owns its PostgreSQL 
 * **Dependencies:** `people`, `shared/outbox`.
 
 **Checklist:**
-- [x] Drizzle schema `packages/database/src/schema/notice.ts`, `notice` API module, and `/notices` page scaffolded.
+- [x] Drizzle schema `packages/database/src/schema/notice.ts`, `notice` API module, `NotificationProcessor`, and `/notices` page implemented/scaffolded.
 - [ ] Add `tsvector` GIN index for Bangla/English notice search.
 - [ ] Implement `POST /api/v1/notices/{id}/publish` enqueueing deduped `SEND_NOTICE` outbox jobs.
-- [ ] Complete `notification.processor.ts` with provider rate-limiting and deduplication.
+- [ ] Wire provider rate-limiting and delivery status tracking in `notification.processor.ts`.
 
 ---
 
@@ -169,9 +168,8 @@ The system is built as a **Modular Monolith**. Every module owns its PostgreSQL 
 * **Dependencies:** `people`, `notice`.
 
 **Checklist:**
-- [x] NestJS `search` controller, service, and repository scaffolded.
-- [ ] Implement `GET /api/v1/search/students`, `/staff`, and `/notices` returning IDs + minimal display labels only.
-- [ ] Enforce `RowScope` filtering after ID lookup so unauthorized records are never returned.
+- [x] NestJS `search` controller, `SearchService` (ID-only lookup + post-lookup `RowScope` filtering), and repository implemented.
+- [ ] Add `pg_trgm` GIN indexes on `people.student` and `people.staff` for sub-50ms fuzzy lookup.
 - [ ] Run Bangla recall benchmark (200 queries across 20k names); trigger Meilisearch spike only if Postgres recall fails threshold.
 
 ---

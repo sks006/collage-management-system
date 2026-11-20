@@ -1,7 +1,7 @@
 # 🏫 School Management System — Master Project Outline
 
-**Version:** 2.1 (Unified Enterprise Edition)
-**Status:** Active Execution — Architecture Locked
+**Version:** 2.2 (Unified Enterprise Edition)
+**Status:** Active Execution — Architecture & RBAC Routing Locked
 **Owner:** Lead Architect / Project Lead
 
 ---
@@ -84,7 +84,7 @@ graph TB
 ```mermaid
 graph TB
     subgraph Client["🟦 Client Tier"]
-        WEB["Next.js 15 App Router<br/>Tailwind CSS + shadcn/ui"]
+        WEB["Next.js 15 App Router<br/>Role-Filtered Views & Landing Redirects"]
     end
 
     subgraph Edge["☁️ Cloudflare Edge"]
@@ -139,7 +139,7 @@ sms-monorepo/
 │       ├── app/(dashboard)/{academic,attendance,attendance/period-close,finance,leave,notices,payroll,staff,students}/
 │       ├── actions/
 │       ├── components/{shared,ui}/
-│       └── lib/{api-client,auth,utils}.ts
+│       └── lib/{api-client,auth,rbac,utils}.ts
 ├── packages/
 │   ├── database/src/{client.ts,index.ts,migrations/,schema/}
 │   └── shared/src/{index.ts,schemas/,types/}
@@ -178,13 +178,24 @@ sms-monorepo/
 
 ---
 
-## 6. Identity, RBAC & Split-Horizon Access
+## 6. Identity, RBAC & Role-Based Frontend Routing
 
-* **7 Canonical Keycloak Roles (`F-1.1`):** `ADMIN`, `PRINCIPAL`, `TEACHER`, `OFFICE`, `FINANCE`, `STUDENT`, `PARENT`.
+*(Full specification in `docs/rbac_and_frontend_matrix.md`)*
+
+* **7 Canonical Keycloak Roles (`F-1.1`):** `ADMIN`, `PRINCIPAL`, `FINANCE`, `OFFICE`, `TEACHER`, `PARENT`, `STUDENT`.
+* **Frictionless Default Landing Redirects (`F-1.8`, `F-6.4`):**
+  Upon Keycloak OIDC login callback (`/login?code=...`), `decodeKeycloakJwt()` inspects `realm_access.roles`, resolves the highest-priority role (`resolvePrimaryRole`), stores HTTP-only cookies, and issues an immediate `302` redirect:
+  * `ADMIN` -> `/` (System Ops Hub)
+  * `PRINCIPAL` -> `/` (Executive KPI Dashboard)
+  * `FINANCE` -> `/finance` (MFS Settlements & Overdue Invoices)
+  * `OFFICE` -> `/students` (Enrollment Queue & CSV Import)
+  * `TEACHER` -> `/attendance` (Today's Assigned Rosters)
+  * `PARENT` -> `/finance` (Ward Invoices & Pay Now)
+  * `STUDENT` -> `/` (Own Attendance % & Notices)
 * **4-Layer Defense-in-Depth:**
   1. **Edge & IdP:** Keycloak OIDC + Google Workspace OAuth (`F-1.2`), mandatory MFA for `ADMIN`/`PRINCIPAL`/`FINANCE` (`F-1.3`), LAN-only Keycloak Admin Console.
-  2. **API Guards (`F-1.4`, `F-1.5`):** Stateless `jose` `JwtGuard` (1h JWKS cache) + `@Roles()` `RolesGuard`.
-  3. **Row-Level Scope (`F-1.7`):** `RequestIdMiddleware` attaches `rowScope` (`sectionIds` for `TEACHER`, `studentIds` for `STUDENT`/`PARENT`).
+  2. **Frontend Route & Sidebar Guards (`apps/web/src/lib/rbac.ts`):** `getAllowedNavItems()` filters sidebar links per role; `(dashboard)/layout.tsx` enforces `canAccessPath()` on every request.
+  3. **API Guards & `RowScope` (`F-1.4`, `F-1.5`, `F-1.7`):** Stateless `jose` `JwtGuard` + `@Roles()` `RolesGuard` + `rowScope` (`sectionIds` for `TEACHER`, `studentIds` for `STUDENT`/`PARENT`).
   4. **Database Grants:** `sms_api`, `sms_worker`, and `sms_payroll_reader` roles enforce physical table isolation.
 * **Split-Horizon DNS:** Campus LAN resolves `sms.school.local` directly to on-premise origin IP so attendance continues uninterrupted during ISP outages; remote users connect via Cloudflare Tunnel (`sms.school.edu.bd`).
 
@@ -192,17 +203,17 @@ sms-monorepo/
 
 ## 7. Unified Roadmap & Feature Mapping
 
-*(Aligned 1:1 with `docs/feature list.md`)*
+*(Aligned 1:1 with `docs/feature list.md` and `docs/rbac_and_frontend_matrix.md`)*
 
 | Phase | Feature IDs | Scope & Deliverables | Exit Gate |
 | :--- | :--- | :--- | :--- |
 | **Phase 0: Foundation** | `F-0.1` – `F-0.5` | 10 ADRs, Nx monorepo, CI/CD, Docker stack, Grafana/Sentry, Outbox consumer | Outbox walking skeleton & CI green |
-| **Phase 1: Identity & RBAC** | `F-1.1` – `F-1.8` | Keycloak 7 roles, Google OAuth, MFA, `jose` guard, bulk provisioning, `RowScope`, Next.js auth shield | All 7 roles & row scopes verified |
+| **Phase 1: Identity & RBAC** | `F-1.1` – `F-1.8` | Keycloak 7 roles, Google OAuth, MFA, `jose` guard, bulk provisioning, `RowScope`, OIDC `302` role landing redirects | All 7 roles & row scopes verified |
 | **Phase 2: Core & Academic** | `F-2.1` – `F-2.8` | Years, terms, classes, sections, subjects, teacher assignments, staff/student directories, enrollments, audit | 20k student CSV import < 5 min |
 | **Phase 3: Attendance & Leave** | `F-3.1` – `F-3.8` | Partitioned `period_event`, `daily_summary` MatView, batch & HMAC device APIs, corrections, leave, calendar | 500 concurrent teachers at p95 < 500ms |
 | **Phase 4: Period Close & Money In** | `F-4.1` – `F-4.10` | Monthly `period_close` lock, append-only ledger, fee schedules, 20k bulk invoices, MFS IPN, poller, recon, R2 receipts | Restore drill #1 & payment pen test |
 | **Phase 5: Money Out / Payroll** | `F-5.1` – `F-5.8` | Payroll state machine, `period_close`-only worker compute, Maker-Checker, BEFTN dispatch, payslips, retry queue | 1-month parallel payroll 100% match |
-| **Phase 6: Search & Notices** | `F-6.1` – `F-6.5` | ID-only Postgres FTS/`pg_trgm` search, Bangla/English role-targeted notices, role dashboards | Bangla search recall verified |
+| **Phase 6: Search & Notices** | `F-6.1` – `F-6.5` | ID-only Postgres FTS/`pg_trgm` search, Bangla/English role-targeted notices, role-filtered dashboards & sidebars | Bangla search recall verified |
 | **Phase 7: Migration & Go-Live** | `F-7.1` – `F-7.7` | Legacy ETL, 2 dry runs + ledger control totals, role training, UAT, Restore drill #2, weekend cutover, hypercare | Production sign-off & live cutover |
 | **Phase 8: Post-Launch** | `F-8.1` – `F-8.6` | BI analytics, LTI 1.3 LMS bridge, React Native mobile apps, library, transport, biometric SDKs | Post-launch backlog |
 
@@ -214,5 +225,5 @@ Every feature pull request must pass all checks before merge:
 1. **Migrations:** Forward and rollback SQL verified in CI.
 2. **Boundary & Unit Tests:** `@nx/enforce-module-boundaries` passes; Vitest (`unplugin-swc`) covers edge cases.
 3. **Integration Tests:** Real PostgreSQL via Testcontainers confirms constraints, outbox rows, and `RowScope`.
-4. **Security & Audit:** `@Roles()` applied, `RowScope` enforced, and `audit.log` entries verified for mutations and PII reads.
+4. **Security & Audit:** `@Roles()` applied, `RowScope` enforced, frontend `canAccessPath` verified, and `audit.log` entries written for mutations and PII reads.
 5. **Observability:** Structured Pino logs (`request_id`, `actor_id`) and outbox metrics verified.
