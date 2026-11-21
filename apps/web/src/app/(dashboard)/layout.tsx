@@ -1,5 +1,5 @@
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
-import { AppSidebar } from "@/components/shared/app-sidebar";
+import { AppSidebar } from "@/components/app-sidebar";
 import { Navbar } from "@/components/shared/navbar";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {

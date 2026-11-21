@@ -212,12 +212,15 @@ const Sidebar = React.forwardRef<
       );
     }
 
+    const isCollapsed = state === "collapsed";
+    const isOffcanvas = collapsible === "offcanvas";
+
     return (
       <div
         ref={ref}
         className="group peer hidden md:block text-sidebar-foreground"
         data-state={state}
-        data-collapsible={state === "collapsed" ? collapsible : ""}
+        data-collapsible={isCollapsed ? collapsible : ""}
         data-variant={variant}
         data-side={side}
       >
@@ -225,16 +228,25 @@ const Sidebar = React.forwardRef<
         <div
           className={cn(
             "duration-200 relative h-svh bg-transparent transition-[width] ease-linear",
-            state === "collapsed" ? "w-[--sidebar-width-icon]" : "w-[--sidebar-width]"
+            isCollapsed
+              ? isOffcanvas
+                ? "w-0"
+                : "w-[--sidebar-width-icon]"
+              : "w-[--sidebar-width]"
           )}
         />
         <div
           className={cn(
-            "duration-200 fixed inset-y-0 z-10 hidden h-svh transition-[left,right,width] ease-linear md:flex flex-col border-r border-sidebar-border bg-sidebar",
+            "duration-200 fixed inset-y-0 z-10 hidden h-svh transition-[left,right,width,transform] ease-linear md:flex flex-col border-r border-sidebar-border bg-sidebar",
             side === "left"
               ? "left-0"
               : "right-0 border-l border-sidebar-border",
-            state === "collapsed" ? "w-[--sidebar-width-icon]" : "w-[--sidebar-width]",
+            isCollapsed && isOffcanvas && (side === "left" ? "-translate-x-full" : "translate-x-full"),
+            isCollapsed
+              ? isOffcanvas
+                ? "w-[--sidebar-width]"
+                : "w-[--sidebar-width-icon]"
+              : "w-[--sidebar-width] translate-x-0",
             variant === "floating" || variant === "inset"
               ? "p-2"
               : "",

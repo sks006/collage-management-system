@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added & Improved
 - **Composable, Themeable shadcn Sidebar Component:**
   - Implemented the official shadcn/ui composable sidebar architecture (`apps/web/src/components/ui/sidebar.tsx`) providing `SidebarProvider`, `Sidebar`, `SidebarHeader`, `SidebarContent`, `SidebarFooter`, `SidebarGroup`, `SidebarGroupLabel`, `SidebarGroupContent`, `SidebarMenu`, `SidebarMenuItem`, `SidebarMenuButton`, `SidebarTrigger`, `SidebarRail`, `SidebarInset`, `SidebarMenuBadge`, `SidebarSeparator`, and `useSidebar`.
+  - Migrated sidebar to canonical shadcn path `components/app-sidebar.tsx` (`apps/web/src/components/app-sidebar.tsx`) and wired it directly in `(dashboard)/layout.tsx`.
+  - Added full offcanvas hide support in `Sidebar`: when collapsed/hidden, the sidebar slides completely off-canvas (`-translate-x-full`, `w-0` space) freeing 100% viewport width.
+  - Added an in-sidebar header toggle button (`PanelLeftClose`) enabling instant one-click hiding directly from inside the sidebar header, alongside navbar `SidebarTrigger` and `Ctrl+B`.
   - Added mobile-first responsive sheet drawer with backdrop blur overlay and desktop collapsible rail (`w-60` expanded, `w-16` icon state) with `Ctrl+B` keyboard toggle.
   - Implemented dynamic grouped navigation in `AppSidebar` (`Overview`, `Academics`, `Operations`, `Finance`, `Communication`) dynamically filtered by active user roles (`ADMIN`, `PRINCIPAL`, `TEACHER`, `FINANCE`, `OFFICE`, `PARENT`, `STUDENT`).
   - Added dedicated CSS variables for themeable sidebar (`--sidebar-background`, `--sidebar-foreground`, `--sidebar-primary`, etc.) in `globals.css` and mapped them into `tailwind.config.ts`.
