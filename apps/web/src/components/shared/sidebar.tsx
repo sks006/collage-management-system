@@ -16,6 +16,7 @@ import {
   UserCog,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getCurrentUser } from "@/lib/auth";
 import { ROLES, type Role } from "@sms/shared";
 
 const NAV_ITEMS = [
@@ -36,22 +37,24 @@ const NAV_ITEMS = [
   { href: "/notices", label: "Notices", icon: Bell, roles: ROLES },
 ];
 
-export function Sidebar({ userRoles = [] }: { userRoles?: string[] }) {
+export function Sidebar({ userRoles }: { userRoles?: string[] }) {
+  const currentUser = getCurrentUser();
+  const roles = userRoles && userRoles.length > 0 ? userRoles : currentUser.roles;
   const pathname = usePathname();
   const visibleItems = NAV_ITEMS.filter((item) =>
-    item.roles.some((r) => userRoles.includes(r)),
+    item.roles.some((r) => roles.includes(r)),
   );
 
   return (
-    <aside className="w-64 border-r bg-card p-4 min-h-screen flex flex-col justify-between">
+    <aside className="w-64 border-r bg-card p-4 min-h-screen flex flex-col justify-between shrink-0">
       <div className="space-y-4">
-        <div className="px-3 py-2 font-bold text-xl tracking-tight text-primary">
+        <Link href="/" className="px-3 py-2 font-bold text-xl tracking-tight text-primary block">
           🏫 Dhaka Model College
-        </div>
+        </Link>
         <nav className="space-y-1">
           {visibleItems.map((item) => {
             const Icon = item.icon;
-            const active = pathname === item.href || pathname.startsWith(item.href + "/");
+            const active = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
             return (
               <Link
                 key={item.href}
@@ -59,11 +62,11 @@ export function Sidebar({ userRoles = [] }: { userRoles?: string[] }) {
                 className={cn(
                   "flex items-center space-x-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
                   active
-                    ? "bg-primary text-primary-foreground"
+                    ? "bg-primary text-primary-foreground shadow-sm"
                     : "text-muted-foreground hover:bg-muted hover:text-foreground",
                 )}
               >
-                <Icon className="h-4 w-4" />
+                <Icon className="h-4 w-4 shrink-0" />
                 <span>{item.label}</span>
               </Link>
             );
@@ -71,10 +74,13 @@ export function Sidebar({ userRoles = [] }: { userRoles?: string[] }) {
         </nav>
       </div>
       <div className="rounded-lg bg-muted p-3 text-xs text-muted-foreground space-y-2">
-        <div>Postgres Source of Truth</div>
-        <div className="font-mono text-[10px] text-emerald-600">● LAN Online · Port 5432</div>
-        <div className="font-mono text-[10px] text-muted-foreground">
-          Roles: {userRoles.join(", ") || "none"}
+        <div className="font-semibold text-foreground">Postgres Source of Truth</div>
+        <div className="font-mono text-[10px] text-emerald-600 flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse inline-block" />
+          <span>Online · Port 5432</span>
+        </div>
+        <div className="font-mono text-[10px] text-muted-foreground truncate">
+          Active: {roles.join(", ")}
         </div>
       </div>
     </aside>
