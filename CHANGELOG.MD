@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.3.0] - 2026-11-21
+
+### Added & Improved
+- **Composable, Themeable shadcn Sidebar Component:**
+  - Implemented the official shadcn/ui composable sidebar architecture (`apps/web/src/components/ui/sidebar.tsx`) providing `SidebarProvider`, `Sidebar`, `SidebarHeader`, `SidebarContent`, `SidebarFooter`, `SidebarGroup`, `SidebarGroupLabel`, `SidebarGroupContent`, `SidebarMenu`, `SidebarMenuItem`, `SidebarMenuButton`, `SidebarTrigger`, `SidebarRail`, `SidebarInset`, `SidebarMenuBadge`, `SidebarSeparator`, and `useSidebar`.
+  - Added mobile-first responsive sheet drawer with backdrop blur overlay and desktop collapsible rail (`w-60` expanded, `w-16` icon state) with `Ctrl+B` keyboard toggle.
+  - Implemented dynamic grouped navigation in `AppSidebar` (`Overview`, `Academics`, `Operations`, `Finance`, `Communication`) dynamically filtered by active user roles (`ADMIN`, `PRINCIPAL`, `TEACHER`, `FINANCE`, `OFFICE`, `PARENT`, `STUDENT`).
+  - Added dedicated CSS variables for themeable sidebar (`--sidebar-background`, `--sidebar-foreground`, `--sidebar-primary`, etc.) in `globals.css` and mapped them into `tailwind.config.ts`.
+  - Added `<SidebarTrigger />` toggle button in the navbar for one-click expand/collapse across mobile and desktop.
+  - Re-exported `AppSidebar as Sidebar` in `components/shared/sidebar.tsx` for backwards compatibility.
+
 ## [2.2.0] - 2026-11-21
 
 ### Added
