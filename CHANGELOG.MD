@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added & Improved
 - **Composable, Themeable shadcn Sidebar Component:**
   - Implemented the official shadcn/ui composable sidebar architecture (`apps/web/src/components/ui/sidebar.tsx`) providing `SidebarProvider`, `Sidebar`, `SidebarHeader`, `SidebarContent`, `SidebarFooter`, `SidebarGroup`, `SidebarGroupLabel`, `SidebarGroupContent`, `SidebarMenu`, `SidebarMenuItem`, `SidebarMenuButton`, `SidebarTrigger`, `SidebarRail`, `SidebarInset`, `SidebarMenuBadge`, `SidebarSeparator`, and `useSidebar`.
+  - Completely hid scrollbars / sliders across the project (`scrollbar-width: none; -ms-overflow-style: none; ::-webkit-scrollbar { display: none; }`) while preserving natural mouse-wheel and touch scrolling.
+  - Set sidebar default state to hidden (`defaultOpen={false}`) with off-canvas slide animation (`collapsible="offcanvas"`), allowing the dashboard to take 100% viewport width until toggled.
   - Configured icon rail collapse (`collapsible="icon"`): when collapsed, the sidebar displays only centered icons (`size-9`), hiding all text labels, group headings, brand titles, and metadata tags with native hover tooltips.
   - Migrated sidebar to canonical shadcn path `components/app-sidebar.tsx` (`apps/web/src/components/app-sidebar.tsx`) and wired it directly in `(dashboard)/layout.tsx`.
   - Added full offcanvas hide support in `Sidebar`: when collapsed/hidden, the sidebar slides completely off-canvas (`-translate-x-full`, `w-0` space) freeing 100% viewport width.

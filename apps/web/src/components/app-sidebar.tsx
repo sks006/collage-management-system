@@ -60,7 +60,7 @@ export interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
 
 export function AppSidebar({
   userRoles,
-  collapsible = "icon",
+  collapsible = "offcanvas",
   className,
   ...props
 }: AppSidebarProps) {
