@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -14,9 +15,13 @@ import {
   BookOpen,
   LogOut,
   CalendarDays,
+  PanelLeftClose,
+  PanelLeftOpen,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
+import { useSidebar } from "@/lib/sidebar-context";
 import { ROLES } from "@sms/shared";
 
 const NAV_ITEMS = [
@@ -39,6 +44,7 @@ const NAV_ITEMS = [
 
 export function Sidebar({ userRoles }: { userRoles?: string[] }) {
   const { user, logout } = useAuth();
+  const { isCollapsed, toggleCollapsed, isMobileOpen, closeMobile } = useSidebar();
   const roles = userRoles && userRoles.length > 0 ? userRoles : (user?.roles || ["ADMIN"]);
   const pathname = usePathname();
 
@@ -46,13 +52,52 @@ export function Sidebar({ userRoles }: { userRoles?: string[] }) {
     item.roles.some((r) => roles.includes(r)),
   );
 
-  return (
-    <aside className="w-60 border-r bg-card p-4 min-h-screen flex flex-col justify-between shrink-0">
+  const sidebarContent = (
+    <div className="flex flex-col h-full justify-between">
       <div className="space-y-4">
-        <Link href="/" className="px-2 py-1.5 flex items-center gap-2 font-bold text-base tracking-tight text-primary rounded-lg hover:bg-muted/50 transition-colors">
-          <span className="text-xl">🏫</span>
-          <span className="truncate">Dhaka Model College</span>
-        </Link>
+        {/* Header with Title and Toggle Button */}
+        <div className="flex items-center justify-between px-2 py-1.5 border-b pb-3">
+          <Link
+            href="/"
+            onClick={closeMobile}
+            className={cn(
+              "flex items-center gap-2 font-bold text-base tracking-tight text-primary rounded-lg transition-colors overflow-hidden",
+              isCollapsed ? "justify-center w-full px-0" : "px-1"
+            )}
+            title="Dhaka Model College"
+          >
+            <span className="text-xl shrink-0">🏫</span>
+            {!isCollapsed && <span className="truncate">Dhaka Model</span>}
+          </Link>
+
+          {/* Toggle button on desktop */}
+          <button
+            type="button"
+            onClick={toggleCollapsed}
+            title={isCollapsed ? "Expand Sidebar (Ctrl+B)" : "Collapse Sidebar (Ctrl+B)"}
+            className={cn(
+              "hidden md:inline-flex p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0",
+              isCollapsed && "mx-auto mt-2"
+            )}
+          >
+            {isCollapsed ? (
+              <PanelLeftOpen className="h-4 w-4" />
+            ) : (
+              <PanelLeftClose className="h-4 w-4" />
+            )}
+          </button>
+
+          {/* Close button on mobile */}
+          <button
+            type="button"
+            onClick={closeMobile}
+            className="md:hidden p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Navigation Links */}
         <nav className="space-y-1">
           {visibleItems.map((item) => {
             const Icon = item.icon;
@@ -61,42 +106,81 @@ export function Sidebar({ userRoles }: { userRoles?: string[] }) {
               <Link
                 key={item.href}
                 href={item.href}
+                onClick={closeMobile}
+                title={item.label}
                 className={cn(
-                  "flex items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors",
+                  "flex items-center rounded-lg text-xs font-medium transition-colors",
+                  isCollapsed
+                    ? "justify-center p-2.5"
+                    : "gap-2.5 px-3 py-2",
                   active
                     ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 )}
               >
                 <Icon className="h-4 w-4 shrink-0" />
-                <span className="truncate">{item.label}</span>
+                {!isCollapsed && <span className="truncate">{item.label}</span>}
               </Link>
             );
           })}
         </nav>
       </div>
 
-      <div className="space-y-3 pt-4 border-t">
-        <div className="rounded-lg bg-muted/50 p-2.5 text-xs text-muted-foreground space-y-1.5">
-          <div className="font-semibold text-foreground text-[11px]">PostgreSQL Source of Truth</div>
-          <div className="font-mono text-[10px] text-emerald-600 flex items-center gap-1.5">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
-            <span>Port 5432 · Online</span>
+      {/* Footer / User Scope */}
+      <div className="space-y-2 pt-3 border-t">
+        {!isCollapsed && (
+          <div className="rounded-lg bg-muted/50 p-2.5 text-xs text-muted-foreground space-y-1.5">
+            <div className="font-semibold text-foreground text-[11px] truncate">PostgreSQL Single Truth</div>
+            <div className="font-mono text-[10px] text-emerald-600 flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+              <span>Port 5432 · Online</span>
+            </div>
+            <div className="font-mono text-[10px] text-muted-foreground truncate">
+              {roles[0]}
+            </div>
           </div>
-          <div className="font-mono text-[10px] text-muted-foreground truncate">
-            Roles: {roles.join(", ")}
-          </div>
-        </div>
+        )}
 
         <button
           type="button"
           onClick={logout}
-          className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors"
+          title="Sign Out"
+          className={cn(
+            "w-full flex items-center rounded-lg text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors",
+            isCollapsed ? "justify-center p-2.5" : "gap-2 px-3 py-2"
+          )}
         >
           <LogOut className="h-4 w-4 shrink-0" />
-          <span>Sign Out</span>
+          {!isCollapsed && <span>Sign Out</span>}
         </button>
       </div>
-    </aside>
+    </div>
+  );
+
+  return (
+    <>
+      {/* Desktop Persistent Sidebar */}
+      <aside
+        className={cn(
+          "hidden md:flex border-r bg-card p-3 min-h-screen flex-col shrink-0 transition-all duration-300 ease-in-out",
+          isCollapsed ? "w-16" : "w-60"
+        )}
+      >
+        {sidebarContent}
+      </aside>
+
+      {/* Mobile Backdrop & Drawer */}
+      {isMobileOpen && (
+        <div className="fixed inset-0 z-50 md:hidden">
+          <div
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+            onClick={closeMobile}
+          />
+          <aside className="fixed inset-y-0 left-0 z-50 w-64 bg-card p-4 shadow-2xl animate-in slide-in-from-left duration-200 border-r">
+            {sidebarContent}
+          </aside>
+        </div>
+      )}
+    </>
   );
 }

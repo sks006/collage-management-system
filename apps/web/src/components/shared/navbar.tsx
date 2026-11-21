@@ -2,12 +2,14 @@
 
 import * as React from "react";
 import { useAuth, DEMO_PERSONAS } from "@/lib/auth-context";
+import { useSidebar } from "@/lib/sidebar-context";
 import { useToast } from "@/components/ui/toast";
-import { Bell, LogOut, User, ShieldCheck, ChevronDown, Check } from "lucide-react";
+import { Bell, LogOut, User, ShieldCheck, ChevronDown, Check, Menu, PanelLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 export function Navbar() {
   const { user, logout, switchPersona } = useAuth();
+  const { toggleCollapsed, toggleMobile } = useSidebar();
   const { toast } = useToast();
   const [showPersonaMenu, setShowPersonaMenu] = React.useState(false);
   const [showNotifications, setShowNotifications] = React.useState(false);
@@ -39,8 +41,28 @@ export function Navbar() {
 
   return (
     <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b bg-card px-4 sm:px-6 shadow-sm">
-      {/* Left: Clean system indicator and breadcrumb (no redundant wrapping college title) */}
-      <div className="flex items-center gap-2.5 min-w-0">
+      {/* Left: Sidebar Toggle and breadcrumb */}
+      <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+        {/* Mobile drawer toggle */}
+        <button
+          type="button"
+          onClick={toggleMobile}
+          className="md:hidden p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0"
+          title="Open Menu"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+
+        {/* Desktop rail collapse toggle */}
+        <button
+          type="button"
+          onClick={toggleCollapsed}
+          className="hidden md:inline-flex p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0"
+          title="Toggle Sidebar"
+        >
+          <PanelLeft className="h-4 w-4" />
+        </button>
+
         <div className="flex items-center gap-2">
           <span className="relative flex h-2 w-2">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
