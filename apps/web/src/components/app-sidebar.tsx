@@ -60,7 +60,7 @@ export interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
 
 export function AppSidebar({
   userRoles,
-  collapsible = "offcanvas",
+  collapsible = "icon",
   className,
   ...props
 }: AppSidebarProps) {
@@ -83,18 +83,19 @@ export function AppSidebar({
 
   return (
     <Sidebar collapsible={collapsible} className={className} {...props}>
-      {/* Brand Header with In-Sidebar Hide/Toggle Button */}
-      <SidebarHeader className="border-b border-sidebar-border px-3 py-2.5">
-        <div className="flex items-center justify-between gap-2">
+      {/* Brand Header */}
+      <SidebarHeader className="border-b border-sidebar-border p-3 group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:justify-center">
+        <div className="flex items-center justify-between gap-2 group-data-[collapsible=icon]:justify-center">
           <Link
             href="/"
             onClick={handleLinkClick}
-            className="flex items-center gap-2.5 min-w-0 flex-1 hover:opacity-90 transition-opacity"
+            title="Dhaka Model College"
+            className="flex items-center gap-2.5 min-w-0 flex-1 hover:opacity-90 transition-opacity group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:flex-none"
           >
             <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold shrink-0 shadow-xs">
               🏫
             </div>
-            <div className="flex flex-col gap-0.5 leading-none min-w-0">
+            <div className="flex flex-col gap-0.5 leading-none min-w-0 group-data-[collapsible=icon]:hidden">
               <span className="font-bold text-sm tracking-tight text-foreground truncate">
                 Dhaka Model
               </span>
@@ -104,28 +105,28 @@ export function AppSidebar({
             </div>
           </Link>
 
-          {/* Dedicated Hide Sidebar button right in the sidebar header */}
+          {/* In-sidebar toggle/collapse button */}
           <button
             type="button"
             onClick={toggleSidebar}
-            title="Hide Sidebar"
-            className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors shrink-0"
+            title="Collapse Sidebar"
+            className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors shrink-0 group-data-[collapsible=icon]:hidden"
           >
             <PanelLeftClose className="h-4 w-4" />
-            <span className="sr-only">Hide Sidebar</span>
+            <span className="sr-only">Collapse Sidebar</span>
           </button>
         </div>
       </SidebarHeader>
 
       {/* Navigation Groups */}
-      <SidebarContent>
+      <SidebarContent className="group-data-[collapsible=icon]:p-1">
         {groups.map((groupName) => (
-          <SidebarGroup key={groupName}>
-            <SidebarGroupLabel className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase px-3">
+          <SidebarGroup key={groupName} className="group-data-[collapsible=icon]:p-0">
+            <SidebarGroupLabel className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase px-3 group-data-[collapsible=icon]:hidden">
               {groupName}
             </SidebarGroupLabel>
             <SidebarGroupContent>
-              <SidebarMenu>
+              <SidebarMenu className="group-data-[collapsible=icon]:items-center">
                 {visibleItems
                   .filter((item) => item.group === groupName)
                   .map((item) => {
@@ -135,7 +136,10 @@ export function AppSidebar({
                       (item.href !== "/" && pathname.startsWith(item.href));
 
                     return (
-                      <SidebarMenuItem key={item.href}>
+                      <SidebarMenuItem
+                        key={item.href}
+                        className="group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center"
+                      >
                         <SidebarMenuButton
                           asChild
                           isActive={isActive}
@@ -144,10 +148,13 @@ export function AppSidebar({
                           <Link
                             href={item.href}
                             onClick={handleLinkClick}
-                            className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium"
+                            title={item.label}
+                            className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:!size-9 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:!gap-0"
                           >
                             <Icon className="size-4 shrink-0" />
-                            <span className="truncate">{item.label}</span>
+                            <span className="truncate group-data-[collapsible=icon]:hidden">
+                              {item.label}
+                            </span>
                           </Link>
                         </SidebarMenuButton>
                       </SidebarMenuItem>
@@ -159,33 +166,31 @@ export function AppSidebar({
         ))}
       </SidebarContent>
 
-      {/* Footer with Session Scope & Sign Out */}
-      <SidebarFooter className="border-t border-sidebar-border p-3 space-y-2">
-        <SidebarMenu>
-          <SidebarMenuItem>
+      {/* Footer */}
+      <SidebarFooter className="border-t border-sidebar-border p-3 space-y-2 group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:items-center">
+        <SidebarMenu className="group-data-[collapsible=icon]:items-center">
+          <SidebarMenuItem className="group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
             <SidebarMenuButton
               size="default"
               onClick={logout}
               tooltip="Sign Out"
-              className="text-destructive hover:bg-destructive/10 hover:text-destructive w-full justify-start"
+              className="text-destructive hover:bg-destructive/10 hover:text-destructive w-full justify-start group-data-[collapsible=icon]:!size-9 group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:justify-center"
             >
               <LogOut className="size-4 shrink-0" />
-              <span>Sign Out</span>
+              <span className="group-data-[collapsible=icon]:hidden">Sign Out</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
 
-        {state === "expanded" && (
-          <div className="rounded-lg bg-muted/40 p-2 text-xs text-muted-foreground space-y-1">
-            <div className="flex items-center justify-between text-[11px] font-semibold text-foreground">
-              <span>PostgreSQL 16</span>
-              <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            </div>
-            <div className="font-mono text-[10px] truncate text-muted-foreground">
-              Role: {roles[0]}
-            </div>
+        <div className="rounded-lg bg-muted/40 p-2 text-xs text-muted-foreground space-y-1 group-data-[collapsible=icon]:hidden">
+          <div className="flex items-center justify-between text-[11px] font-semibold text-foreground">
+            <span>PostgreSQL 16</span>
+            <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
           </div>
-        )}
+          <div className="font-mono text-[10px] truncate text-muted-foreground">
+            Role: {roles[0]}
+          </div>
+        </div>
       </SidebarFooter>
 
       {/* Resizable / Hoverable Rail */}

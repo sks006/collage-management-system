@@ -493,7 +493,7 @@ const SidebarMenuButton = React.forwardRef<
           size === "default" && "h-9 text-xs",
           size === "sm" && "h-7 text-xs",
           size === "lg" && "h-11 text-sm",
-          "group-data-[collapsible=icon]:!size-9 group-data-[collapsible=icon]:!p-2 group-data-[collapsible=icon]:justify-center",
+          "group-data-[collapsible=icon]:!size-9 group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:items-center",
           className
         )}
         {...(props as any)}
