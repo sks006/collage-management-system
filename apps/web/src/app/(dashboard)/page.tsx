@@ -193,8 +193,8 @@ export default function DashboardPage() {
               <DollarSign className="h-4 w-4 text-primary" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatBDT(4250000)}</div>
-              <p className="text-xs text-muted-foreground">bKash, Nagad, Bank Cards (Aggregator)</p>
+              <div className="text-xl sm:text-2xl font-bold truncate tracking-tight">{formatBDT(4250000)}</div>
+              <p className="text-xs text-muted-foreground truncate">bKash, Nagad, Bank Cards</p>
             </CardContent>
           </Card>
 

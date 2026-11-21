@@ -47,10 +47,11 @@ export function Sidebar({ userRoles }: { userRoles?: string[] }) {
   );
 
   return (
-    <aside className="w-64 border-r bg-card p-4 min-h-screen flex flex-col justify-between shrink-0">
+    <aside className="w-60 border-r bg-card p-4 min-h-screen flex flex-col justify-between shrink-0">
       <div className="space-y-4">
-        <Link href="/" className="px-3 py-2 font-bold text-xl tracking-tight text-primary block">
-          🏫 Dhaka Model College
+        <Link href="/" className="px-2 py-1.5 flex items-center gap-2 font-bold text-base tracking-tight text-primary rounded-lg hover:bg-muted/50 transition-colors">
+          <span className="text-xl">🏫</span>
+          <span className="truncate">Dhaka Model College</span>
         </Link>
         <nav className="space-y-1">
           {visibleItems.map((item) => {
@@ -61,14 +62,14 @@ export function Sidebar({ userRoles }: { userRoles?: string[] }) {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex items-center space-x-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                  "flex items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors",
                   active
                     ? "bg-primary text-primary-foreground shadow-sm"
                     : "text-muted-foreground hover:bg-muted hover:text-foreground",
                 )}
               >
                 <Icon className="h-4 w-4 shrink-0" />
-                <span>{item.label}</span>
+                <span className="truncate">{item.label}</span>
               </Link>
             );
           })}
@@ -76,20 +77,21 @@ export function Sidebar({ userRoles }: { userRoles?: string[] }) {
       </div>
 
       <div className="space-y-3 pt-4 border-t">
-        <div className="rounded-lg bg-muted/60 p-3 text-xs text-muted-foreground space-y-2">
-          <div className="font-semibold text-foreground">Postgres Source of Truth</div>
+        <div className="rounded-lg bg-muted/50 p-2.5 text-xs text-muted-foreground space-y-1.5">
+          <div className="font-semibold text-foreground text-[11px]">PostgreSQL Source of Truth</div>
           <div className="font-mono text-[10px] text-emerald-600 flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse inline-block" />
-            <span>Online · Port 5432</span>
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
+            <span>Port 5432 · Online</span>
           </div>
           <div className="font-mono text-[10px] text-muted-foreground truncate">
-            Active: {roles.join(", ")}
+            Roles: {roles.join(", ")}
           </div>
         </div>
 
         <button
+          type="button"
           onClick={logout}
-          className="w-full flex items-center space-x-3 rounded-md px-3 py-2 text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors"
+          className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors"
         >
           <LogOut className="h-4 w-4 shrink-0" />
           <span>Sign Out</span>

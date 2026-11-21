@@ -227,12 +227,12 @@ export default function StudentsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[140px]">Admission No</TableHead>
-                  <TableHead>Student Name (English / বাংলা)</TableHead>
-                  <TableHead>Class & Section</TableHead>
-                  <TableHead>Guardian Mobile</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead className="min-w-[140px]">Admission No</TableHead>
+                  <TableHead className="min-w-[180px]">Student Name (English / বাংলা)</TableHead>
+                  <TableHead className="min-w-[160px]">Class & Section</TableHead>
+                  <TableHead className="min-w-[140px]">Guardian Mobile</TableHead>
+                  <TableHead className="min-w-[100px]">Status</TableHead>
+                  <TableHead className="text-right min-w-[110px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

@@ -38,24 +38,36 @@ export function Navbar() {
   };
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b bg-card px-6 shadow-sm">
-      <div className="flex items-center space-x-3">
-        <span className="font-bold text-lg text-primary tracking-tight">Dhaka Model College</span>
-        <Badge variant="outline" className="hidden sm:inline-flex text-[11px] bg-muted/50 font-mono">
-          PostgreSQL Single Source of Truth
+    <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b bg-card px-4 sm:px-6 shadow-sm">
+      {/* Left: Clean system indicator and breadcrumb (no redundant wrapping college title) */}
+      <div className="flex items-center gap-2.5 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+          </span>
+          <span className="text-xs font-semibold text-foreground whitespace-nowrap hidden sm:inline-block">
+            Dhaka Model College
+          </span>
+        </div>
+        <span className="text-muted-foreground/40 hidden sm:inline-block">|</span>
+        <Badge variant="outline" className="hidden lg:inline-flex text-[10px] font-mono bg-muted/40 text-muted-foreground whitespace-nowrap">
+          PostgreSQL 16 · Single Source of Truth
         </Badge>
       </div>
 
-      <div className="flex items-center space-x-3">
+      {/* Right: Actions & User Menu */}
+      <div className="flex items-center gap-2 sm:gap-3 shrink-0">
         {/* Dynamic Persona Switcher Dropdown */}
         <div className="relative">
           <button
+            type="button"
             onClick={() => setShowPersonaMenu(!showPersonaMenu)}
-            className="flex items-center space-x-2 text-xs font-medium px-3 py-1.5 rounded-full border border-border bg-muted/60 hover:bg-muted transition-colors"
+            className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-full border border-border bg-muted/60 hover:bg-muted transition-colors whitespace-nowrap"
           >
-            <ShieldCheck className="h-3.5 w-3.5 text-primary" />
+            <ShieldCheck className="h-3.5 w-3.5 text-primary shrink-0" />
             <span>Role: <strong className="text-foreground">{user?.roles[0] || "USER"}</strong></span>
-            <ChevronDown className="h-3 w-3 text-muted-foreground" />
+            <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
           </button>
 
           {showPersonaMenu && (
@@ -68,6 +80,7 @@ export function Navbar() {
                 return (
                   <button
                     key={key}
+                    type="button"
                     onClick={() => handleRoleSelect(key)}
                     className={`w-full flex items-center justify-between px-2.5 py-2 rounded-md hover:bg-muted text-left transition-colors ${
                       isActive ? "bg-primary/10 text-primary font-semibold" : ""
@@ -88,8 +101,10 @@ export function Navbar() {
         {/* Notifications */}
         <div className="relative">
           <button
+            type="button"
             onClick={() => setShowNotifications(!showNotifications)}
-            className="relative rounded-full p-2 hover:bg-muted text-muted-foreground transition-colors"
+            className="relative rounded-full p-2 hover:bg-muted text-muted-foreground transition-colors shrink-0"
+            title="Notifications"
           >
             <Bell className="h-4 w-4" />
             <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-500 animate-pulse" />
@@ -99,7 +114,7 @@ export function Navbar() {
             <div className="absolute right-0 mt-2 w-80 rounded-xl border bg-card p-3 shadow-xl z-50 text-card-foreground text-xs animate-in fade-in duration-150">
               <div className="flex items-center justify-between pb-2 border-b font-semibold">
                 <span>Recent Notifications</span>
-                <span className="text-[10px] text-primary">Mark all as read</span>
+                <span className="text-[10px] text-primary cursor-pointer hover:underline">Mark all as read</span>
               </div>
               <div className="divide-y max-h-60 overflow-y-auto">
                 {notifications.map((n) => (
@@ -115,18 +130,19 @@ export function Navbar() {
         </div>
 
         {/* User Profile & Logout */}
-        <div className="flex items-center space-x-3 border-l pl-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-xs">
+        <div className="flex items-center gap-2 border-l pl-2 sm:pl-3 shrink-0">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-xs shrink-0">
             {user?.name ? user.name.slice(0, 2).toUpperCase() : <User className="h-4 w-4" />}
           </div>
-          <div className="hidden md:block text-left text-xs">
-            <div className="font-semibold text-foreground leading-tight">{user?.name || "Dr. Rafiqul Islam"}</div>
-            <div className="text-[11px] text-muted-foreground truncate max-w-[150px]">{user?.email}</div>
+          <div className="hidden md:block text-left text-xs min-w-0 max-w-[130px]">
+            <div className="font-semibold text-foreground truncate">{user?.name || "Dr. Rafiqul Islam"}</div>
+            <div className="text-[11px] text-muted-foreground truncate">{user?.email}</div>
           </div>
           <button
+            type="button"
             onClick={handleLogout}
             title="Log Out"
-            className="flex items-center space-x-1 p-1.5 text-xs text-muted-foreground hover:text-destructive hover:bg-red-50 dark:hover:bg-red-950/30 rounded-md transition-colors"
+            className="flex items-center gap-1 p-1.5 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-md transition-colors whitespace-nowrap shrink-0"
           >
             <LogOut className="h-4 w-4" />
             <span className="hidden sm:inline text-xs font-medium">Log out</span>

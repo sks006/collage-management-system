@@ -206,9 +206,9 @@ export default function FinancePage() {
             <CardTitle className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Fee Inflow (Credits)</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-emerald-600">{formatBDT(totalCollected || 9000)}</div>
-            <p className="text-[11px] text-muted-foreground flex items-center gap-1 mt-1">
-              <ArrowDownLeft className="h-3.5 w-3.5 text-emerald-500" />
+            <div className="text-xl sm:text-2xl font-bold text-emerald-600 truncate tracking-tight">{formatBDT(totalCollected || 9000)}</div>
+            <p className="text-[11px] text-muted-foreground flex items-center gap-1 mt-1 truncate">
+              <ArrowDownLeft className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
               <span>Settled via bKash / Nagad</span>
             </p>
           </CardContent>
@@ -218,9 +218,9 @@ export default function FinancePage() {
             <CardTitle className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Payroll Outflow (Debits)</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-rose-600">{formatBDT(totalDisbursed || 120000)}</div>
-            <p className="text-[11px] text-muted-foreground flex items-center gap-1 mt-1">
-              <ArrowUpRight className="h-3.5 w-3.5 text-rose-500" />
+            <div className="text-xl sm:text-2xl font-bold text-rose-600 truncate tracking-tight">{formatBDT(totalDisbursed || 120000)}</div>
+            <p className="text-[11px] text-muted-foreground flex items-center gap-1 mt-1 truncate">
+              <ArrowUpRight className="h-3.5 w-3.5 text-rose-500 shrink-0" />
               <span>BEFTN Bank Batch</span>
             </p>
           </CardContent>
@@ -230,8 +230,8 @@ export default function FinancePage() {
             <CardTitle className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Ledger Invariant #8</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-primary">Append-Only</div>
-            <p className="text-[11px] text-muted-foreground">ZERO UPDATE / DELETE permitted</p>
+            <div className="text-xl sm:text-2xl font-bold text-primary truncate tracking-tight">Append-Only</div>
+            <p className="text-[11px] text-muted-foreground truncate mt-1">ZERO UPDATE / DELETE</p>
           </CardContent>
         </Card>
         <Card className="shadow-sm">
@@ -239,8 +239,8 @@ export default function FinancePage() {
             <CardTitle className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Reconciliation</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-600">100% Match</div>
-            <p className="text-[11px] text-muted-foreground">Automatic nocturnal audit</p>
+            <div className="text-xl sm:text-2xl font-bold text-blue-600 truncate tracking-tight">100% Match</div>
+            <p className="text-[11px] text-muted-foreground truncate mt-1">Automatic nocturnal audit</p>
           </CardContent>
         </Card>
       </div>
