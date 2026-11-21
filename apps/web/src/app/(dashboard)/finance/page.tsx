@@ -200,7 +200,7 @@ export default function FinancePage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <Card className="shadow-sm">
           <CardHeader className="pb-1">
             <CardTitle className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Fee Inflow (Credits)</CardTitle>
@@ -268,6 +268,7 @@ export default function FinancePage() {
                   <Skeleton className="h-8 w-full" />
                 </div>
               ) : (
+                <div className="w-full overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -338,6 +339,7 @@ export default function FinancePage() {
                     )}
                   </TableBody>
                 </Table>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -354,6 +356,7 @@ export default function FinancePage() {
               </div>
             </CardHeader>
             <CardContent className="p-0">
+              <div className="w-full overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -401,6 +404,7 @@ export default function FinancePage() {
                   ))}
                 </TableBody>
               </Table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

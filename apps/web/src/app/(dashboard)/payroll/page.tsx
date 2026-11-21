@@ -174,7 +174,7 @@ export default function PayrollPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <Card className="shadow-sm">
           <CardHeader className="pb-1">
             <CardTitle className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Monthly Net Payroll</CardTitle>
@@ -222,7 +222,8 @@ export default function PayrollPage() {
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          <Table>
+          <div className="w-full overflow-x-auto">
+            <Table>
             <TableHeader>
               <TableRow>
                 <TableHead className="min-w-[130px]">Run ID</TableHead>
@@ -288,6 +289,7 @@ export default function PayrollPage() {
               ))}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
 
@@ -298,7 +300,8 @@ export default function PayrollPage() {
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          <Table>
+          <div className="w-full overflow-x-auto">
+            <Table>
             <TableHeader>
               <TableRow>
                 <TableHead className="min-w-[100px]">Line ID</TableHead>
@@ -344,6 +347,7 @@ export default function PayrollPage() {
               ))}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
 

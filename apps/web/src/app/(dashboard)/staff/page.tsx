@@ -134,46 +134,46 @@ export default function StaffPage() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="shadow-sm">
-          <CardHeader className="pb-1">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+        <Card className="shadow-xs">
+          <CardHeader className="pb-2">
             <CardTitle className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Faculty & Admin</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{staffList.length}</div>
+            <div className="text-2xl font-bold tracking-tight">{staffList.length}</div>
             <p className="text-[11px] text-muted-foreground">Permanent & contracted</p>
           </CardContent>
         </Card>
-        <Card className="shadow-sm">
-          <CardHeader className="pb-1">
+        <Card className="shadow-xs">
+          <CardHeader className="pb-2">
             <CardTitle className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Active Status</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-emerald-600">100%</div>
+            <div className="text-2xl font-bold tracking-tight text-emerald-600">100%</div>
             <p className="text-[11px] text-muted-foreground">On-duty today</p>
           </CardContent>
         </Card>
-        <Card className="shadow-sm">
-          <CardHeader className="pb-1">
+        <Card className="shadow-xs">
+          <CardHeader className="pb-2">
             <CardTitle className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Payroll Link</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-primary">BEFTN Ready</div>
+            <div className="text-2xl font-bold tracking-tight text-primary">BEFTN Ready</div>
             <p className="text-[11px] text-muted-foreground">Bank account verification</p>
           </CardContent>
         </Card>
-        <Card className="shadow-sm">
-          <CardHeader className="pb-1">
+        <Card className="shadow-xs">
+          <CardHeader className="pb-2">
             <CardTitle className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Row Scopes</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-600">Enforced</div>
+            <div className="text-2xl font-bold tracking-tight text-blue-600">Enforced</div>
             <p className="text-[11px] text-muted-foreground">teacher_section RLS filters</p>
           </CardContent>
         </Card>
       </div>
 
-      <Card className="shadow-sm">
+      <Card className="shadow-xs">
         <CardHeader className="p-4 border-b">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
             <div className="relative flex-1 max-w-sm">
@@ -197,64 +197,70 @@ export default function StaffPage() {
               <Skeleton className="h-8 w-full" />
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[130px]">Employee ID</TableHead>
-                  <TableHead>Staff Name</TableHead>
-                  <TableHead>Designation & Department</TableHead>
-                  <TableHead>Contact Info</TableHead>
-                  <TableHead>Base Salary</TableHead>
-                  <TableHead className="text-right">Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredStaff.length === 0 ? (
+            <div className="w-full overflow-x-auto">
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                      No matching staff records found.
-                    </TableCell>
+                    <TableHead className="w-[130px] whitespace-nowrap">Employee ID</TableHead>
+                    <TableHead className="min-w-[160px] whitespace-nowrap">Staff Name</TableHead>
+                    <TableHead className="min-w-[180px] whitespace-nowrap">Designation & Department</TableHead>
+                    <TableHead className="min-w-[200px] whitespace-nowrap">Contact Info</TableHead>
+                    <TableHead className="min-w-[110px] whitespace-nowrap">Base Salary</TableHead>
+                    <TableHead className="text-right whitespace-nowrap">Status</TableHead>
                   </TableRow>
-                ) : (
-                  filteredStaff.map((st) => (
-                    <TableRow key={st.id}>
-                      <TableCell className="font-mono text-xs font-semibold text-primary">
-                        {st.employeeNo}
-                      </TableCell>
-                      <TableCell>
-                        <div className="font-medium text-foreground">{st.nameEn || st.name}</div>
-                        {st.nameBn && <div className="text-xs text-muted-foreground">{st.nameBn}</div>}
-                      </TableCell>
-                      <TableCell className="text-xs">
-                        <span className="font-medium">{st.designation}</span>
-                        <span className="text-muted-foreground block">{st.department}</span>
-                      </TableCell>
-                      <TableCell className="text-xs">
-                        <div className="flex items-center gap-1.5 text-muted-foreground">
-                          <Mail className="h-3 w-3" />
-                          <span>{st.email}</span>
-                        </div>
-                        <div className="flex items-center gap-1.5 text-muted-foreground mt-0.5 font-mono">
-                          <Phone className="h-3 w-3" />
-                          <span>{st.phone}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="font-semibold text-sm">
-                        {st.baseSalary ? formatBDT(st.baseSalary) : "—"}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Badge
-                          variant={st.status === "ACTIVE" ? "success" : "warning"}
-                          className="text-[10px] uppercase font-semibold"
-                        >
-                          {st.status}
-                        </Badge>
+                </TableHeader>
+                <TableBody>
+                  {filteredStaff.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                        No matching staff records found.
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                  ) : (
+                    filteredStaff.map((st) => (
+                      <TableRow key={st.id}>
+                        <TableCell className="font-mono text-xs font-semibold text-primary whitespace-nowrap">
+                          {st.employeeNo}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap">
+                          <div className="font-medium text-foreground">{st.nameEn || st.name}</div>
+                          {st.nameBn && <div className="text-xs text-muted-foreground">{st.nameBn}</div>}
+                        </TableCell>
+                        <TableCell className="text-xs whitespace-nowrap">
+                          <span className="font-medium">{st.designation}</span>
+                          <span className="text-muted-foreground block">{st.department}</span>
+                        </TableCell>
+                        <TableCell className="text-xs whitespace-nowrap">
+                          <div className="flex items-center gap-1.5 text-muted-foreground">
+                            <Mail className="h-3 w-3" />
+                            <span>{st.email}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 text-muted-foreground">
+                            <Phone className="h-3 w-3" />
+                            <span>{st.phone}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-xs font-mono font-medium whitespace-nowrap">
+                          {formatBDT(st.baseSalary || 50000)}
+                        </TableCell>
+                        <TableCell className="text-right whitespace-nowrap">
+                          <Badge
+                            variant="outline"
+                            className={
+                              st.status === "ACTIVE"
+                                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                : "bg-amber-50 text-amber-700 border-amber-200"
+                            }
+                          >
+                            {st.status}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>

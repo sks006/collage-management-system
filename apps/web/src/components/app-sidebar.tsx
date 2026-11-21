@@ -167,30 +167,23 @@ export function AppSidebar({
       </SidebarContent>
 
       {/* Footer */}
-      <SidebarFooter className="border-t border-sidebar-border p-3 space-y-2 group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:items-center">
+      <SidebarFooter className="border-t border-sidebar-border p-2 group-data-[collapsible=icon]:p-2">
         <SidebarMenu className="group-data-[collapsible=icon]:items-center">
           <SidebarMenuItem className="group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
             <SidebarMenuButton
               size="default"
               onClick={logout}
               tooltip="Sign Out"
-              className="text-destructive hover:bg-destructive/10 hover:text-destructive w-full justify-start group-data-[collapsible=icon]:!size-9 group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:justify-center"
+              className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive w-full justify-start group-data-[collapsible=icon]:!size-9 group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:justify-center transition-colors"
             >
               <LogOut className="size-4 shrink-0" />
               <span className="group-data-[collapsible=icon]:hidden">Sign Out</span>
+              <span className="ml-auto text-[10px] font-mono text-muted-foreground/70 group-data-[collapsible=icon]:hidden">
+                {roles[0]}
+              </span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
-
-        <div className="rounded-lg bg-muted/40 p-2 text-xs text-muted-foreground space-y-1 group-data-[collapsible=icon]:hidden">
-          <div className="flex items-center justify-between text-[11px] font-semibold text-foreground">
-            <span>PostgreSQL 16</span>
-            <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-          </div>
-          <div className="font-mono text-[10px] truncate text-muted-foreground">
-            Role: {roles[0]}
-          </div>
-        </div>
       </SidebarFooter>
 
       {/* Resizable / Hoverable Rail */}

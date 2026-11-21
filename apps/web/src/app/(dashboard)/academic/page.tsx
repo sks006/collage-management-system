@@ -134,7 +134,7 @@ export default function AcademicPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <Card className="shadow-sm">
           <CardHeader className="pb-1">
             <CardTitle className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Active Year</CardTitle>
@@ -186,6 +186,7 @@ export default function AcademicPage() {
               <CardTitle className="text-sm font-semibold">Active Classes (academic.class)</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
+              <div className="w-full overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -216,6 +217,7 @@ export default function AcademicPage() {
                   ))}
                 </TableBody>
               </Table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -226,6 +228,7 @@ export default function AcademicPage() {
               <CardTitle className="text-sm font-semibold">Class Sections (academic.section)</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
+              <div className="w-full overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -260,6 +263,7 @@ export default function AcademicPage() {
                   ))}
                 </TableBody>
               </Table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -270,6 +274,7 @@ export default function AcademicPage() {
               <CardTitle className="text-sm font-semibold">Academic Years (academic.academic_year)</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
+              <div className="w-full overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -303,6 +308,7 @@ export default function AcademicPage() {
                   ))}
                 </TableBody>
               </Table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

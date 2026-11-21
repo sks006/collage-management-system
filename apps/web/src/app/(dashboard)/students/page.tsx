@@ -160,7 +160,7 @@ export default function StudentsPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <Card className="shadow-sm">
           <CardHeader className="pb-1">
             <CardTitle className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Total Enrolled</CardTitle>
@@ -224,7 +224,8 @@ export default function StudentsPage() {
               <Skeleton className="h-8 w-full" />
             </div>
           ) : (
-            <Table>
+            <div className="w-full overflow-x-auto">
+              <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead className="min-w-[140px]">Admission No</TableHead>
@@ -288,6 +289,7 @@ export default function StudentsPage() {
                 )}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>

@@ -164,7 +164,7 @@ export default function DashboardPage() {
 
       {/* Dynamic Role-Specific Metrics */}
       {role === "STUDENT" || role === "PARENT" ? (
-        <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-xs font-semibold text-muted-foreground">My Attendance Rate</CardTitle>
@@ -207,7 +207,7 @@ export default function DashboardPage() {
           </Card>
         </div>
       ) : role === "TEACHER" ? (
-        <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-xs font-semibold text-muted-foreground">Assigned Classes</CardTitle>
@@ -250,7 +250,7 @@ export default function DashboardPage() {
           </Card>
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Enrolled Students</CardTitle>
@@ -367,7 +367,7 @@ export default function DashboardPage() {
       )}
 
       {/* Quick Navigation Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         <Card className="hover:shadow-md transition-shadow">
           <CardHeader>
             <CardTitle className="text-base flex items-center justify-between">

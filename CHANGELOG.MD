@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.5.0] - 2026-11-21
+
+### Fixed & Improved
+- **Responsive Layout & shadcn/ui Design Consistency:**
+  - **Horizontal Overflow & Cut-off Elimination:** Fixed `SidebarInset` flex child shrinking by adding `min-w-0 w-full overflow-hidden` so child grids and wide tables never cause horizontal page blowout or push content off-screen.
+  - **Responsive Metric Grids:** Migrated all metric card grids across `staff`, `students`, `payroll`, `finance`, `attendance`, `period-close`, `academic`, `leave`, `notices`, and `dashboard` from rigid `grid-cols-2 md:grid-cols-4` to responsive `grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4`.
+  - **Responsive Table Containers:** Wrapped all `<Table>` elements across every dashboard page in `<div className="w-full overflow-x-auto">` with `whitespace-nowrap` on data cells, ensuring tables scroll horizontally inside their card containers rather than breaking whole-page responsiveness.
+  - **Sidebar Vertical Height & Active States:**
+    - Standardized `SidebarMenuButton` active state to official subtle shadcn highlight (`data-[active=true]:bg-primary/10 data-[active=true]:text-primary data-[active=true]:font-semibold data-[active=true]:shadow-xs`), replacing custom solid electric purple backgrounds.
+    - Compacted sidebar footer to a 36px slim sign-out button, allowing all navigation items and `Fees & Ledger` to fit comfortably in viewport height without vertical clipping.
+  - **Syntax Error Resolution:** Removed duplicate JSX block in `staff/page.tsx` that previously caused webpack compilation failure and unstyled asset delivery.
+
 ## [2.4.0] - 2026-11-21
 
 ### Added & Improved
