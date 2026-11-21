@@ -13,6 +13,8 @@ import {
   ProvisionUserDto,
   RegisterDto,
   VerifyOtpDto,
+  LoginDto,
+  CallbackDto,
 } from '../services/auth.service';
 import { JwtAuthGuard } from '../../../shared/guards/jwt.guard';
 import { RolesGuard } from '../../../shared/guards/roles.guard';
@@ -21,6 +23,38 @@ import { Roles } from '../../../shared/decorators/roles.decorator';
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
+
+  /**
+   * Public: Institutional & Keycloak credential login
+   */
+  @Post('login')
+  login(@Body() dto: LoginDto) {
+    return this.authService.login(dto);
+  }
+
+  /**
+   * Public: OIDC authorization code callback exchange
+   */
+  @Post('callback')
+  callback(@Body() dto: CallbackDto) {
+    return this.authService.handleOidcCallback(dto);
+  }
+
+  /**
+   * Public: Resend 6-digit verification OTP
+   */
+  @Post('resend-otp')
+  resendOtp(@Body('email') email: string) {
+    return this.authService.resendOtp(email);
+  }
+
+  /**
+   * Public: Verification email token link handler
+   */
+  @Post('verify-email')
+  verifyEmail(@Body('token') token: string) {
+    return this.authService.verifyEmail(token);
+  }
 
   /**
    * Public: User Registration with Gmail OTP initiation

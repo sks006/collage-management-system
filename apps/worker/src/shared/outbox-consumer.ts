@@ -101,6 +101,12 @@ export class OutboxConsumer implements OnModuleInit, OnModuleDestroy {
 
   private async dispatch(type: string, payload: any) {
     switch (type) {
+      case "SEND_OTP_EMAIL":
+        return this.notificationProcessor.handleSendOtpEmail(payload);
+      case "ADMIN_ROLE_REQUEST":
+        return this.notificationProcessor.handleAdminRoleRequest(payload);
+      case "SEND_ROLE_APPROVED_EMAIL":
+        return this.notificationProcessor.handleSendRoleApprovedEmail(payload);
       case "NOTIFY_ABSENTEE_PARENTS":
         return this.notificationProcessor.handleAbsenteeNotification(payload);
       case "SEND_NOTICE":
@@ -116,6 +122,7 @@ export class OutboxConsumer implements OnModuleInit, OnModuleDestroy {
         return this.reconcileProcessor.reconcile5Min();
       default:
         logger.warn({ type }, "[Outbox] Unknown job type received");
+        return null;
     }
   }
 }

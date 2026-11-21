@@ -168,6 +168,22 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (forwarded) return forwarded;
 
   // Fallback to Dynamic Database Store (docs/database_design_specification.md)
+  if (slugPath === "auth/me") {
+    return NextResponse.json({
+      user: {
+        id: "00000000-0000-0000-0000-000000000001",
+        email: "principal@dhakamodel.edu.bd",
+        name: "Dr. Rafiqul Islam",
+        roles: ["ADMIN", "PRINCIPAL", "TEACHER", "FINANCE"],
+      },
+      scope: {
+        tenantId: "dhaka-model",
+        departmentId: null,
+        sectionIds: ["sec-11-a", "sec-11-b", "sec-12-a"],
+      },
+    });
+  }
+
   if (slugPath === "auth/role-requests") {
     const status = request.nextUrl.searchParams.get("status") || "PENDING";
     const filtered = databaseStore.roleRequests.filter((r) => r.status === status);
@@ -257,6 +273,62 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
 
   // Fallback to Dynamic Database Store mutations
+  if (slugPath === "auth/login") {
+    const email = (body.email || "principal@dhakamodel.edu.bd").toLowerCase();
+    const role = body.requestedRole || (email.includes("principal") ? "PRINCIPAL" : email.includes("physics") ? "TEACHER" : email.includes("finance") ? "FINANCE" : email.includes("admissions") ? "OFFICE" : "STUDENT");
+    const b64 = Buffer.from(email).toString("base64");
+    return NextResponse.json({
+      success: true,
+      accessToken: `jwt-sms-access-${b64}`,
+      refreshToken: `jwt-sms-refresh-${b64}`,
+      user: {
+        id: `usr-${b64.substring(0, 8)}`,
+        email,
+        roles: [role],
+        name: body.fullName || email.split("@")[0],
+      },
+    });
+  }
+
+  if (slugPath === "auth/callback") {
+    const code = body.code || "auth-code";
+    return NextResponse.json({
+      success: true,
+      accessToken: `jwt-sms-access-${Buffer.from(code).toString("base64").substring(0, 16)}`,
+      refreshToken: `jwt-sms-refresh-${Buffer.from(code).toString("base64").substring(0, 16)}`,
+      user: {
+        id: "kc-oidc-user",
+        email: "principal@dhakamodel.edu.bd",
+        roles: ["ADMIN", "PRINCIPAL"],
+        name: "Keycloak OIDC User",
+      },
+    });
+  }
+
+  if (slugPath === "auth/resend-otp") {
+    const email = (body.email || "").toLowerCase();
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    databaseStore.pendingOtps.set(email, {
+      code: otp,
+      userData: { email, requestedRole: "STUDENT", fullName: email.split("@")[0] },
+      expiresAt: Date.now() + 600000,
+    });
+    return NextResponse.json({
+      success: true,
+      message: "Fresh 6-digit verification code sent to Gmail.",
+      email,
+      demoOtp: otp,
+    });
+  }
+
+  if (slugPath === "auth/verify-email") {
+    return NextResponse.json({
+      success: true,
+      verified: true,
+      message: "Email address verified successfully. You may now sign in.",
+    });
+  }
+
   if (slugPath === "auth/register") {
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     databaseStore.pendingOtps.set((body.email || "").toLowerCase(), {

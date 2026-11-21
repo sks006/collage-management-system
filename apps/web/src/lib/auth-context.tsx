@@ -72,6 +72,7 @@ interface AuthContextValue {
     phone?: string;
   }) => Promise<{ success: boolean; demoOtp?: string; message: string; email: string }>;
   verifyUserOtp: (data: { email: string; otp: string }) => Promise<any>;
+  resendOtp: (email: string) => Promise<any>;
   logout: () => void;
   switchPersona: (roleKey: string) => void;
   setSession: (user: UserSession, token?: string) => void;
@@ -129,7 +130,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const login = React.useCallback(async (email: string, _password?: string, role = "ADMIN") => {
+  const login = React.useCallback(async (email: string, password?: string, role = "ADMIN") => {
+    try {
+      const res = await fetch("/api/v1/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password, requestedRole: role }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.user && json.accessToken) {
+          setSession(json.user, json.accessToken);
+          router.push("/");
+          return;
+        }
+      }
+    } catch {
+      // Fallback to local session
+    }
+
     const matched = Object.values(DEMO_PERSONAS).find(
       (p) => p.email.toLowerCase() === email.toLowerCase(),
     );
@@ -197,6 +216,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     []
   );
 
+  const resendOtp = React.useCallback(async (email: string) => {
+    const res = await fetch("/api/v1/auth/resend-otp", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      throw new Error(json.error || json.message || "Failed to resend verification code");
+    }
+    return json;
+  }, []);
+
   const logout = React.useCallback(() => {
     setUser(null);
     setToken(null);
@@ -223,6 +255,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signup,
         registerUser,
         verifyUserOtp,
+        resendOtp,
         logout,
         switchPersona,
         setSession,

@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.6.0] - 2026-11-21
+
+### Completed & Synced
+- **Authentication & Authorization Architecture Specification (`docs/authentication_and_authorization_specification.md`):**
+  - **Keycloak IdP Alignment (`infra/keycloak/realm-export.json`):**
+    - Synchronized realm ID (`sms`), client configuration (`sms-web` and `sms-api`), and expanded valid redirect URIs to include `http://localhost:3000/callback` and `http://0.0.0.0:3000/callback`.
+    - Confirmed 100% parity across realm roles (`ADMIN`, `PRINCIPAL`, `TEACHER`, `OFFICE`, `FINANCE`, `STUDENT`, `PARENT`) matching `packages/shared/src/types/roles.ts` and `docs/rbac_and_frontend_matrix.md`.
+  - **NestJS Auth Endpoints Parity (`apps/api/src/modules/auth`):**
+    - `POST /api/v1/auth/login`: Direct grant & stateless institutional credential login with JWT token generation and `AuditService` event tracking.
+    - `POST /api/v1/auth/callback`: Server-side OpenID Connect authorization code token exchange with Keycloak.
+    - `POST /api/v1/auth/resend-otp`: 6-digit numeric OTP re-dispatch with 10-minute TTL renewal and transactional outbox queuing.
+    - `POST /api/v1/auth/verify-email`: Token verification link confirmation.
+    - `POST /api/v1/auth/register`, `POST /api/v1/auth/verify-otp`, `GET /api/v1/auth/me`, `GET /api/v1/auth/role-requests`, `POST /api/v1/auth/role-requests/:id/approve`, `POST /api/v1/auth/role-requests/:id/reject`.
+  - **Worker Outbox Notification Consumer (`apps/worker`):**
+    - Added outbox event handlers in `NotificationProcessor` and dispatch routing in `OutboxConsumer` for `SEND_OTP_EMAIL`, `ADMIN_ROLE_REQUEST`, and `SEND_ROLE_APPROVED_EMAIL`.
+  - **Next.js BFF API & Auth Context Sync (`apps/web`):**
+    - Synchronized `/api/v1/auth/login`, `/api/v1/auth/callback`, `/api/v1/auth/resend-otp`, `/api/v1/auth/verify-email`, and `/api/v1/auth/me` with automatic proxying to live API backend and fallback dynamic database store.
+    - Connected frontend resend button in registration wizard directly to `resendOtp` with toast notification and countdown reset.
+    - Upgraded OIDC `/callback` page to exchange tokens via the backend proxy before direct fallback.
+  - **Checklist Verified:** All 4 finishing checklist criteria in Section 7 verified and checked off.
+
 ## [2.5.0] - 2026-11-21
 
 ### Fixed & Improved

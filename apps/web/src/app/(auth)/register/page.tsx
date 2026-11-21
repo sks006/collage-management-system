@@ -37,7 +37,7 @@ type OnboardingStep = "DETAILS" | "OTP" | "ACTIVE_SUCCESS" | "PENDING_APPROVAL";
 
 export default function RegisterPage() {
   const router = useRouter();
-  const { registerUser, verifyUserOtp, setSession } = useAuth();
+  const { registerUser, verifyUserOtp, resendOtp, setSession } = useAuth();
   const { toast } = useToast();
 
   const [step, setStep] = React.useState<OnboardingStep>("DETAILS");
@@ -99,6 +99,31 @@ export default function RegisterPage() {
       toast({
         title: "Registration Error",
         description: err.message || "Failed to start registration.",
+        type: "error",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    setIsLoading(true);
+    try {
+      const res = await resendOtp(email);
+      if (res.demoOtp) {
+        setDemoOtp(res.demoOtp);
+        setOtp(res.demoOtp);
+      }
+      setTimeLeft(600);
+      toast({
+        title: "Code Resent",
+        description: "A fresh 6-digit verification code was sent to your Gmail.",
+        type: "success",
+      });
+    } catch (err: any) {
+      toast({
+        title: "Resend Error",
+        description: err.message || "Failed to resend code.",
         type: "error",
       });
     } finally {
@@ -456,7 +481,7 @@ export default function RegisterPage() {
                     </span>
                     <button
                       type="button"
-                      onClick={() => handleDetailsSubmit({ preventDefault: () => {} } as any)}
+                      onClick={handleResendOtp}
                       className="text-primary hover:underline font-medium"
                     >
                       Resend Code
