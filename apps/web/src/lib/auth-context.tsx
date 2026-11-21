@@ -63,6 +63,15 @@ interface AuthContextValue {
   login: (email: string, password?: string, role?: string) => Promise<void>;
   loginWithKeycloak: () => void;
   signup: (userData: { name: string; email: string; role: string; phone?: string }) => Promise<void>;
+  registerUser: (data: {
+    email: string;
+    password?: string;
+    fullName: string;
+    requestedRole: string;
+    referenceNo?: string;
+    phone?: string;
+  }) => Promise<{ success: boolean; demoOtp?: string; message: string; email: string }>;
+  verifyUserOtp: (data: { email: string; otp: string }) => Promise<any>;
   logout: () => void;
   switchPersona: (roleKey: string) => void;
   setSession: (user: UserSession, token?: string) => void;
@@ -149,6 +158,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.push("/");
   }, [router, setSession]);
 
+  const registerUser = React.useCallback(
+    async (data: {
+      email: string;
+      password?: string;
+      fullName: string;
+      requestedRole: string;
+      referenceNo?: string;
+      phone?: string;
+    }) => {
+      const res = await fetch("/api/v1/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error || json.message || "Failed to send verification code");
+      }
+      return json;
+    },
+    []
+  );
+
+  const verifyUserOtp = React.useCallback(
+    async (data: { email: string; otp: string }) => {
+      const res = await fetch("/api/v1/auth/verify-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error || json.message || "Invalid verification code");
+      }
+      return json;
+    },
+    []
+  );
+
   const logout = React.useCallback(() => {
     setUser(null);
     setToken(null);
@@ -173,6 +221,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         login,
         loginWithKeycloak,
         signup,
+        registerUser,
+        verifyUserOtp,
         logout,
         switchPersona,
         setSession,

@@ -6,6 +6,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/lib/auth-context";
+import { useToast } from "@/components/ui/toast";
 import { formatBDT } from "@/lib/utils";
 import {
   Users,
@@ -19,11 +20,96 @@ import {
   ShieldCheck,
   BookOpen,
   CalendarDays,
+  UserCheck,
+  XCircle,
+  Clock,
+  KeyRound,
 } from "lucide-react";
+
+interface RoleRequestItem {
+  id: string;
+  email: string;
+  fullName: string;
+  requestedRole: string;
+  referenceNo?: string;
+  status: string;
+  createdAt: string;
+}
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const role = user?.roles[0] || "ADMIN";
+  const isAdminOrPrincipal = role === "ADMIN" || role === "PRINCIPAL";
+
+  const [roleRequests, setRoleRequests] = React.useState<RoleRequestItem[]>([]);
+  const [loadingRequests, setLoadingRequests] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!isAdminOrPrincipal) return;
+    const fetchRequests = async () => {
+      setLoadingRequests(true);
+      try {
+        const res = await fetch("/api/v1/auth/role-requests");
+        const json = await res.json();
+        if (json.data) {
+          setRoleRequests(json.data);
+        }
+      } catch {
+        // Fallback
+      } finally {
+        setLoadingRequests(false);
+      }
+    };
+    fetchRequests();
+  }, [isAdminOrPrincipal]);
+
+  const handleApprove = async (id: string, name: string, roleName: string) => {
+    try {
+      const res = await fetch(`/api/v1/auth/role-requests/${id}/approve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      if (res.ok) {
+        setRoleRequests((prev) => prev.filter((r) => r.id !== id));
+        toast({
+          title: "Staff Role Approved",
+          description: `Granted ${roleName} permissions to ${name}. Activation notice dispatched.`,
+          type: "success",
+        });
+      }
+    } catch {
+      toast({
+        title: "Approval Failed",
+        description: "Could not approve role request.",
+        type: "error",
+      });
+    }
+  };
+
+  const handleReject = async (id: string, name: string) => {
+    try {
+      const res = await fetch(`/api/v1/auth/role-requests/${id}/reject`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (res.ok) {
+        setRoleRequests((prev) => prev.filter((r) => r.id !== id));
+        toast({
+          title: "Role Request Rejected",
+          description: `Declined staff access for ${name}.`,
+          type: "info",
+        });
+      }
+    } catch {
+      toast({
+        title: "Rejection Failed",
+        description: "Could not reject role request.",
+        type: "error",
+      });
+    }
+  };
 
   return (
     <div className="space-y-8">
@@ -209,6 +295,75 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         </div>
+      )}
+
+      {/* Admin Gated Staff Role Approvals Widget (onboarding_and_verification_specification.md) */}
+      {isAdminOrPrincipal && roleRequests.length > 0 && (
+        <Card className="border-amber-200 bg-amber-50/20 shadow-sm">
+          <CardHeader className="pb-3 border-b">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="h-5 w-5 text-amber-600" />
+                <CardTitle className="text-base font-semibold">
+                  Pending Staff Role Approvals
+                </CardTitle>
+                <Badge className="bg-amber-500 text-white hover:bg-amber-600 text-xs px-2 py-0.5">
+                  {roleRequests.length} Pending
+                </Badge>
+              </div>
+              <span className="text-xs text-muted-foreground font-mono">
+                Keycloak OIDC · Gmail Verified
+              </span>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-4 space-y-3">
+            <div className="divide-y divide-border">
+              {roleRequests.map((req) => (
+                <div key={req.id} className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-sm text-foreground">{req.fullName}</span>
+                      <Badge variant="outline" className="text-xs bg-muted/60">
+                        {req.requestedRole}
+                      </Badge>
+                      {req.referenceNo && (
+                        <span className="text-[11px] font-mono text-muted-foreground">
+                          ID: {req.referenceNo}
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs text-muted-foreground flex items-center gap-2">
+                      <span>{req.email}</span>
+                      <span>·</span>
+                      <span className="flex items-center gap-1 text-emerald-600">
+                        <CheckCircle2 className="h-3 w-3" /> OTP Verified
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 text-xs text-destructive hover:bg-destructive/10"
+                      onClick={() => handleReject(req.id, req.fullName)}
+                    >
+                      <XCircle className="h-3.5 w-3.5 mr-1" />
+                      Reject
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
+                      onClick={() => handleApprove(req.id, req.fullName, req.requestedRole)}
+                    >
+                      <UserCheck className="h-3.5 w-3.5 mr-1" />
+                      Approve {req.requestedRole}
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Quick Navigation Cards */}

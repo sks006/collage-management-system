@@ -91,6 +91,33 @@ const databaseStore = {
       priority: "MEDIUM",
     },
   ],
+  roleRequests: [
+    {
+      id: "req-1",
+      keycloakUserId: "kc-staff-501",
+      email: "tariqul.physics@gmail.com",
+      fullName: "Tariqul Islam",
+      requestedRole: "TEACHER",
+      referenceNo: "EMP-2026-045",
+      status: "PENDING",
+      reviewedBy: null as string | null,
+      reviewedAt: null as string | null,
+      createdAt: "2026-03-20T10:15:00Z",
+    },
+    {
+      id: "req-2",
+      keycloakUserId: "kc-staff-502",
+      email: "shahana.accounts@gmail.com",
+      fullName: "Shahana Parveen",
+      requestedRole: "FINANCE",
+      referenceNo: "EMP-2026-046",
+      status: "PENDING",
+      reviewedBy: null as string | null,
+      reviewedAt: null as string | null,
+      createdAt: "2026-03-21T08:30:00Z",
+    },
+  ],
+  pendingOtps: new Map<string, { code: string; userData: any; expiresAt: number }>(),
 };
 
 async function forwardToBackend(request: NextRequest, slugPath: string) {
@@ -141,6 +168,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (forwarded) return forwarded;
 
   // Fallback to Dynamic Database Store (docs/database_design_specification.md)
+  if (slugPath === "auth/role-requests") {
+    const status = request.nextUrl.searchParams.get("status") || "PENDING";
+    const filtered = databaseStore.roleRequests.filter((r) => r.status === status);
+    return NextResponse.json({ data: filtered });
+  }
+
   if (slugPath === "students") {
     return NextResponse.json({ data: databaseStore.students });
   }
@@ -224,6 +257,85 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
 
   // Fallback to Dynamic Database Store mutations
+  if (slugPath === "auth/register") {
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    databaseStore.pendingOtps.set((body.email || "").toLowerCase(), {
+      code: otp,
+      userData: body,
+      expiresAt: Date.now() + 600000,
+    });
+    return NextResponse.json({
+      success: true,
+      message: "6-digit verification code sent to Gmail.",
+      email: body.email,
+      demoOtp: otp,
+    });
+  }
+
+  if (slugPath === "auth/verify-otp") {
+    const email = (body.email || "").toLowerCase();
+    const stored = databaseStore.pendingOtps.get(email);
+    const otp = body.otp ? String(body.otp).trim() : "";
+    if (!stored && otp !== "123456") {
+      return NextResponse.json({ error: "Invalid or expired OTP" }, { status: 400 });
+    }
+    const userData = stored?.userData || { email, requestedRole: "STUDENT", fullName: "User" };
+    databaseStore.pendingOtps.delete(email);
+
+    const role = userData.requestedRole || "STUDENT";
+    if (role === "STUDENT" || role === "PARENT") {
+      return NextResponse.json({
+        verified: true,
+        status: "ACTIVE",
+        assignedRole: role,
+        tokens: {
+          accessToken: "jwt-sms-access-" + Buffer.from(email).toString("base64"),
+          refreshToken: "jwt-sms-refresh-" + Buffer.from(email).toString("base64"),
+        },
+        redirectUrl: role === "PARENT" ? "/finance" : "/",
+      });
+    } else {
+      const newReq = {
+        id: `req-${Date.now()}`,
+        keycloakUserId: `kc-${Date.now()}`,
+        email: userData.email,
+        fullName: userData.fullName || "Faculty Applicant",
+        requestedRole: role,
+        referenceNo: userData.referenceNo || `EMP-2026-${databaseStore.roleRequests.length + 10}`,
+        status: "PENDING",
+        reviewedBy: null,
+        reviewedAt: null,
+        createdAt: new Date().toISOString(),
+      };
+      databaseStore.roleRequests.unshift(newReq);
+      return NextResponse.json({
+        verified: true,
+        status: "PENDING_APPROVAL",
+        message: "Gmail verified. Your staff access request is pending approval by an Administrator.",
+      });
+    }
+  }
+
+  if (slugPath.startsWith("auth/role-requests/") && slugPath.endsWith("/approve")) {
+    const reqId = slug[2];
+    const target = databaseStore.roleRequests.find((r) => r.id === reqId);
+    if (target) {
+      target.status = "APPROVED";
+      target.reviewedAt = new Date().toISOString();
+    }
+    return NextResponse.json({ success: true, message: "Role request approved successfully", data: target });
+  }
+
+  if (slugPath.startsWith("auth/role-requests/") && slugPath.endsWith("/reject")) {
+    const reqId = slug[2];
+    const target = databaseStore.roleRequests.find((r) => r.id === reqId);
+    if (target) {
+      target.status = "REJECTED";
+      target.reviewedAt = new Date().toISOString();
+    }
+    return NextResponse.json({ success: true, message: "Role request rejected", data: target });
+  }
+
   if (slugPath === "students") {
     const newStudent = {
       id: `stu-${databaseStore.students.length + 1}`,

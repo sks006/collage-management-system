@@ -67,3 +67,18 @@ export const enrollment = peopleSchema.table("enrollment", {
 }, (t) => ({
   unq: uniqueIndex().on(t.studentId, t.academicYearId),
 }));
+
+export const roleRequest = peopleSchema.table("role_request", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  keycloakUserId: text("keycloak_user_id").notNull(),
+  email: text("email").notNull(),
+  fullName: text("full_name").notNull(),
+  requestedRole: text("requested_role").notNull(),
+  referenceNo: text("reference_no"),
+  status: text("status").default("PENDING").notNull(),
+  reviewedBy: uuid("reviewed_by"),
+  reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  pendingIdx: index("idx_role_request_pending").on(t.status, t.createdAt),
+}));

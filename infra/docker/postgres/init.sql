@@ -144,3 +144,19 @@ CREATE INDEX IF NOT EXISTS outbox_job_status_next_idx
 -- Attendance composite lookup
 CREATE INDEX IF NOT EXISTS period_event_student_date_idx
   ON attendance.period_event (student_id, event_date);
+
+-- Role Request Table (Onboarding & Verification Specification)
+CREATE TABLE IF NOT EXISTS people.role_request (
+    id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    keycloak_user_id text UNIQUE NOT NULL,
+    email            text NOT NULL,
+    full_name        text NOT NULL,
+    requested_role   text NOT NULL CHECK (requested_role IN ('STUDENT', 'PARENT', 'TEACHER', 'FINANCE', 'OFFICE')),
+    reference_no     text,
+    status           text NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED')),
+    reviewed_by      uuid,
+    reviewed_at      timestamptz,
+    created_at       timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_role_request_pending ON people.role_request (status, created_at DESC) WHERE status = 'PENDING';

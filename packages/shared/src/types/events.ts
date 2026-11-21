@@ -8,6 +8,9 @@ export const OUTBOX_EVENT_TYPES = [
   "GENERATE_PDF",
   "RECONCILE_PAYMENTS",
   "ALERT",
+  "SEND_OTP_EMAIL",
+  "ADMIN_ROLE_REQUEST",
+  "SEND_ROLE_APPROVED_EMAIL",
 ] as const;
 
 export type OutboxEventType = typeof OUTBOX_EVENT_TYPES[number];

@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.4.0] - 2026-11-21
+
+### Added & Improved
+- **User Onboarding, Gmail OTP Verification & Role Approval Specification (`docs/onboarding_and_verification_specification.md`):**
+  - **Database Schema Addition (`people.role_request`):** Created `people.role_request` table in `packages/database/src/schema/people.ts` and `infra/docker/postgres/init.sql` with partial index `idx_role_request_pending` on `(status, created_at DESC) WHERE status = 'PENDING'`.
+  - **Backend API (`apps/api/src/modules/auth`):**
+    - `POST /api/v1/auth/register`: Public registration endpoint validating role whitelist, generating 6-digit numeric OTP with 10-minute TTL and max 5 attempts limit, creating unverified Keycloak user, and enqueuing `SEND_OTP_EMAIL` outbox job.
+    - `POST /api/v1/auth/verify-otp`: Public OTP verification. Auto-assigns `STUDENT` and `PARENT` realm roles with instant session tokens, or queues `PENDING` staff role request with `ADMIN_ROLE_REQUEST` outbox job for `TEACHER`, `FINANCE`, and `OFFICE`.
+    - `GET /api/v1/auth/role-requests`: Protected endpoint (`@Roles('ADMIN', 'PRINCIPAL')`) returning pending staff access applications.
+    - `POST /api/v1/auth/role-requests/:id/approve`: Protected 1-click approval assigning Keycloak role (+ mandatory TOTP MFA for `FINANCE`), publishing `SEND_ROLE_APPROVED_EMAIL` outbox job, and logging to `audit.log`.
+    - `POST /api/v1/auth/role-requests/:id/reject`: Protected rejection endpoint logging to `audit.log`.
+  - **Frontend Onboarding Wizard (`apps/web/src/app/(auth)/register/page.tsx`):**
+    - Multi-step wizard with visual role indicators (Instant Access vs Admin Review + MFA).
+    - 6-digit numeric OTP input with 10-minute countdown timer, resend button, and dev demo code pill.
+    - Post-OTP automatic redirect to `/` (Student) or `/finance` (Parent) with session establishment.
+    - Post-OTP staff status banner ("Gmail Verified — Awaiting Admin Approval") with zero privilege escalation guarantee.
+  - **Admin Ops Hub Approval Widget (`apps/web/src/app/(dashboard)/page.tsx`):**
+    - Real-time approval card for `ADMIN` and `PRINCIPAL` personas displaying applicant details, Gmail verification badge, and 1-click Approve/Reject actions.
+
 ## [2.3.0] - 2026-11-21
 
 ### Added & Improved
