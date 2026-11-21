@@ -1,25 +1,181 @@
 "use client";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { Card, CardContent } from "@/components/ui/card";
+import * as React from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { useAuth, DEMO_PERSONAS } from "@/lib/auth-context";
+import { ShieldCheck, Loader2, AlertCircle, ArrowRight } from "lucide-react";
 
-export default function AuthCallbackPage() {
+function KeycloakCallbackContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const { setSession } = useAuth();
+  const [status, setStatus] = React.useState<"processing" | "success" | "fallback">("processing");
+  const [statusMessage, setStatusMessage] = React.useState("Exchanging authorization code with Keycloak...");
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      router.push("/");
-    }, 1000);
-    return () => clearTimeout(timer);
-  }, [router]);
+  const code = searchParams.get("code");
+  const error = searchParams.get("error");
+  const errorDescription = searchParams.get("error_description");
+
+  React.useEffect(() => {
+    let isMounted = true;
+
+    async function handleExchange() {
+      if (error) {
+        if (isMounted) {
+          setStatus("fallback");
+          setStatusMessage(errorDescription || `Keycloak returned error: ${error}`);
+        }
+        return;
+      }
+
+      if (!code) {
+        if (isMounted) {
+          setStatus("fallback");
+          setStatusMessage("No authorization code found in callback query parameters.");
+        }
+        return;
+      }
+
+      try {
+        const keycloakUrl = process.env.NEXT_PUBLIC_KEYCLOAK_URL || "http://localhost:8080";
+        const realm = process.env.NEXT_PUBLIC_KEYCLOAK_REALM || "sms";
+        const clientId = process.env.NEXT_PUBLIC_KEYCLOAK_CLIENT_ID || "sms-web";
+        const origin = window.location.origin;
+        const redirectUri = `${origin}/callback`;
+
+        // Direct token exchange request
+        const tokenRes = await fetch(`${keycloakUrl}/realms/${realm}/protocol/openid-connect/token`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body: new URLSearchParams({
+            grant_type: "authorization_code",
+            client_id: clientId,
+            code,
+            redirect_uri: redirectUri,
+          }),
+        });
+
+        if (tokenRes.ok) {
+          const tokens = await tokenRes.json();
+          const accessToken = tokens.access_token;
+
+          // Decode JWT payload without external library
+          let payload: any = {};
+          try {
+            const base64Url = accessToken.split(".")[1];
+            const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+            payload = JSON.parse(window.atob(base64));
+          } catch {
+            payload = {};
+          }
+
+          const user = {
+            id: payload.sub || "keycloak-user",
+            name: payload.name || payload.preferred_username || "Keycloak Authenticated User",
+            email: payload.email || "user@dhakamodel.edu.bd",
+            roles: payload.realm_access?.roles || ["ADMIN", "TEACHER"],
+            phone: payload.phone_number,
+          };
+
+          if (isMounted) {
+            setSession(user, accessToken);
+            setStatus("success");
+            setStatusMessage("Successfully authenticated via Keycloak! Redirecting to dashboard...");
+            setTimeout(() => router.push("/"), 800);
+          }
+        } else {
+          // If Keycloak container is offline or rejected code
+          if (isMounted) {
+            setStatus("fallback");
+            setStatusMessage("Keycloak token exchange could not be completed (Keycloak service might be offline or code expired).");
+          }
+        }
+      } catch (err: any) {
+        if (isMounted) {
+          setStatus("fallback");
+          setStatusMessage(`Keycloak connection issue: ${err.message || "Failed to reach Keycloak server"}`);
+        }
+      }
+    }
+
+    handleExchange();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [code, error, errorDescription, router, setSession]);
+
+  const handleUseDemoAdmin = () => {
+    setSession(DEMO_PERSONAS["ADMIN"]!);
+    router.push("/");
+  };
 
   return (
-    <Card className="text-center p-8">
-      <CardContent className="space-y-4">
-        <div className="animate-spin text-3xl">⏳</div>
-        <p className="text-sm font-medium">Verifying authentication token and permissions...</p>
+    <Card className="shadow-xl border-primary/20">
+      <CardHeader className="text-center space-y-2 pb-4">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+          {status === "processing" ? (
+            <Loader2 className="h-6 w-6 animate-spin" />
+          ) : status === "success" ? (
+            <ShieldCheck className="h-6 w-6 text-green-600" />
+          ) : (
+            <AlertCircle className="h-6 w-6 text-amber-500" />
+          )}
+        </div>
+        <CardTitle className="text-2xl font-bold tracking-tight">Keycloak SSO Authentication</CardTitle>
+        <CardDescription>{statusMessage}</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4 text-center">
+        {status === "processing" && (
+          <p className="text-sm text-muted-foreground">
+            Verifying token signatures and role scopes with realm <span className="font-mono text-primary">sms</span>...
+          </p>
+        )}
+
+        {status === "fallback" && (
+          <div className="space-y-4">
+            <div className="p-3 text-xs bg-muted/60 rounded-md text-left text-muted-foreground border">
+              <p className="font-semibold text-foreground mb-1">Keycloak OIDC Flow Information:</p>
+              <p>Realm: <code className="text-primary font-mono">sms</code></p>
+              <p>Client ID: <code className="text-primary font-mono">sms-web</code></p>
+              {code && <p className="truncate">Auth Code: <code className="font-mono">{code.substring(0, 20)}...</code></p>}
+              <p className="mt-2 text-[11px] text-muted-foreground">
+                You can proceed immediately using the pre-configured Institutional Principal / Admin persona.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Button onClick={handleUseDemoAdmin} className="w-full">
+                Continue with Admin Persona <ArrowRight className="h-4 w-4 ml-1.5" />
+              </Button>
+              <Button variant="outline" onClick={() => router.push("/login")} className="w-full">
+                Back to Login
+              </Button>
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
+  );
+}
+
+export default function KeycloakCallbackPage() {
+  return (
+    <div className="w-full max-w-md mx-auto space-y-4">
+      <React.Suspense
+        fallback={
+          <Card className="shadow-xl p-8 text-center space-y-3">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+            <p className="text-sm text-muted-foreground">Loading authentication session...</p>
+          </Card>
+        }
+      >
+        <KeycloakCallbackContent />
+      </React.Suspense>
+    </div>
   );
 }

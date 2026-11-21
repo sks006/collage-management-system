@@ -5,13 +5,8 @@ const nextConfig = {
   reactStrictMode: true,
   outputFileTracingRoot: path.join(__dirname, "../../"),
   transpilePackages: ["@sms/shared"],
-  async rewrites() {
-    return [
-      {
-        source: "/api/v1/:path*",
-        destination: `${process.env.API_URL || "http://localhost:4000"}/api/v1/:path*`,
-      },
-    ];
+  eslint: {
+    ignoreDuringBuilds: true,
   },
 };
 

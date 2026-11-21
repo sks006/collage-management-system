@@ -58,19 +58,24 @@ export const DEMO_PERSONAS: Record<string, UserSession> = {
 
 interface AuthContextValue {
   user: UserSession | null;
+  token: string | null;
   isAuthenticated: boolean;
   login: (email: string, password?: string, role?: string) => Promise<void>;
+  loginWithKeycloak: () => void;
   signup: (userData: { name: string; email: string; role: string; phone?: string }) => Promise<void>;
   logout: () => void;
   switchPersona: (roleKey: string) => void;
+  setSession: (user: UserSession, token?: string) => void;
 }
 
 const AuthContext = React.createContext<AuthContextValue | null>(null);
 
 const STORAGE_KEY = "sms_active_user";
+const TOKEN_KEY = "sms_access_token";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = React.useState<UserSession | null>(DEMO_PERSONAS["ADMIN"]!);
+  const [token, setToken] = React.useState<string | null>(null);
   const [mounted, setMounted] = React.useState(false);
   const router = useRouter();
 
@@ -78,13 +83,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setMounted(true);
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
+      const storedToken = localStorage.getItem(TOKEN_KEY);
       if (stored) {
         setUser(JSON.parse(stored));
       } else {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(DEMO_PERSONAS["ADMIN"]!));
       }
+      if (storedToken) {
+        setToken(storedToken);
+      }
     } catch {
       // Fallback
+    }
+  }, []);
+
+  const loginWithKeycloak = React.useCallback(() => {
+    const keycloakUrl = process.env.NEXT_PUBLIC_KEYCLOAK_URL || "http://localhost:8080";
+    const realm = process.env.NEXT_PUBLIC_KEYCLOAK_REALM || "sms";
+    const clientId = process.env.NEXT_PUBLIC_KEYCLOAK_CLIENT_ID || "sms-web";
+    const origin = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
+    const redirectUri = encodeURIComponent(`${origin}/callback`);
+    const state = encodeURIComponent(Math.random().toString(36).substring(2));
+
+    const authUrl = `${keycloakUrl}/realms/${realm}/protocol/openid-connect/auth?client_id=${clientId}&response_type=code&scope=openid%20profile%20email&redirect_uri=${redirectUri}&state=${state}`;
+    window.location.href = authUrl;
+  }, []);
+
+  const setSession = React.useCallback((newUser: UserSession, accessToken?: string) => {
+    setUser(newUser);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(newUser));
+      if (accessToken) {
+        localStorage.setItem(TOKEN_KEY, accessToken);
+        setToken(accessToken);
+      }
     }
   }, []);
 
@@ -100,12 +132,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       roles: [role],
     };
 
-    setUser(newUser);
-    if (typeof window !== "undefined") {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(newUser));
-    }
+    setSession(newUser);
     router.push("/");
-  }, [router]);
+  }, [router, setSession]);
 
   const signup = React.useCallback(async (data: { name: string; email: string; role: string; phone?: string }) => {
     const newUser: UserSession = {
@@ -116,38 +145,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       phone: data.phone,
     };
 
-    setUser(newUser);
-    if (typeof window !== "undefined") {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(newUser));
-    }
+    setSession(newUser);
     router.push("/");
-  }, [router]);
+  }, [router, setSession]);
 
   const logout = React.useCallback(() => {
     setUser(null);
+    setToken(null);
     if (typeof window !== "undefined") {
       localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(TOKEN_KEY);
     }
     router.push("/login");
   }, [router]);
 
   const switchPersona = React.useCallback((roleKey: string) => {
     const persona = DEMO_PERSONAS[roleKey] || DEMO_PERSONAS["ADMIN"]!;
-    setUser(persona);
-    if (typeof window !== "undefined") {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(persona));
-    }
-  }, []);
+    setSession(persona);
+  }, [setSession]);
 
   return (
     <AuthContext.Provider
       value={{
         user,
+        token,
         isAuthenticated: !!user,
         login,
+        loginWithKeycloak,
         signup,
         logout,
         switchPersona,
+        setSession,
       }}
     >
       {children}

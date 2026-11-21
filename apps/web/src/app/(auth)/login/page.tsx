@@ -8,10 +8,22 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useAuth, DEMO_PERSONAS } from "@/lib/auth-context";
 import { useToast } from "@/components/ui/toast";
-import { GraduationCap, ShieldCheck, UserCheck, KeyRound, Sparkles } from "lucide-react";
+import {
+  GraduationCap,
+  ShieldCheck,
+  UserCheck,
+  KeyRound,
+  Sparkles,
+  Lock,
+  ExternalLink,
+  Users,
+  Coins,
+  Briefcase,
+  BookOpen,
+} from "lucide-react";
 
 export default function LoginPage() {
-  const { login, switchPersona } = useAuth();
+  const { login, loginWithKeycloak, switchPersona } = useAuth();
   const { toast } = useToast();
   const [email, setEmail] = React.useState("principal@dhakamodel.edu.bd");
   const [password, setPassword] = React.useState("password123");
@@ -24,7 +36,7 @@ export default function LoginPage() {
       await login(email, password);
       toast({
         title: "Signed In Successfully",
-        description: `Welcome back to Dhaka Model College Portal.`,
+        description: `Welcome back to Dhaka Model College Institutional Portal.`,
         type: "success",
       });
     } finally {
@@ -57,10 +69,37 @@ export default function LoginPage() {
           </div>
           <CardTitle className="text-2xl font-bold tracking-tight">Dhaka Model College</CardTitle>
           <CardDescription>
-            Institutional Portal · Sign in to access your role-based dashboard
+            Institutional Management System · Authenticate with Keycloak OIDC or Institutional ID
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Keycloak SSO Action Button */}
+          <div className="space-y-2">
+            <Button
+              type="button"
+              variant="default"
+              className="w-full h-11 bg-indigo-600 hover:bg-indigo-700 text-white font-medium shadow-sm transition-all"
+              onClick={loginWithKeycloak}
+            >
+              <KeyRound className="h-4 w-4 mr-2" />
+              Sign In with Keycloak SSO
+              <ExternalLink className="h-3.5 w-3.5 ml-auto opacity-70" />
+            </Button>
+            <p className="text-[11px] text-muted-foreground text-center">
+              Authenticates against Keycloak Realm <span className="font-mono text-primary font-medium">sms</span> (OAuth 2.0 / OIDC)
+            </p>
+          </div>
+
+          <div className="relative py-1">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t border-border" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-card px-2 text-muted-foreground font-medium">Or Institutional Login</span>
+            </div>
+          </div>
+
+          {/* Standard Institutional Credentials */}
           <form onSubmit={handleCredentialsLogin} className="space-y-3">
             <div className="space-y-1">
               <label className="text-xs font-semibold text-foreground">Institutional Email</label>
@@ -86,22 +125,23 @@ export default function LoginPage() {
               />
             </div>
             <Button type="submit" className="w-full mt-2" disabled={isLoading}>
-              {isLoading ? "Signing in..." : "Sign In to Dashboard"}
+              {isLoading ? "Signing in..." : "Sign In with Credentials"}
             </Button>
           </form>
 
-          <div className="relative py-2">
+          {/* Quick Demo Persona Switcher */}
+          <div className="relative py-1">
             <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
+              <span className="w-full border-t border-border" />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-card px-2 text-muted-foreground font-medium">Or Quick Demo Login</span>
+              <span className="bg-card px-2 text-muted-foreground font-medium">Quick Persona Switch</span>
             </div>
           </div>
 
           <div className="space-y-1.5">
             <p className="text-[11px] text-muted-foreground text-center">
-              Click any persona to log in instantly with that role's permissions:
+              Instant login with verified role permissions:
             </p>
             <div className="grid grid-cols-2 gap-2">
               <Button
@@ -119,8 +159,8 @@ export default function LoginPage() {
                 className="justify-start text-xs h-9 hover:border-primary"
                 onClick={() => handleQuickPersona("TEACHER")}
               >
-                <UserCheck className="h-3.5 w-3.5 text-emerald-600 mr-1.5 shrink-0" />
-                <span className="truncate">Teacher (Faculty)</span>
+                <BookOpen className="h-3.5 w-3.5 text-blue-500 mr-1.5 shrink-0" />
+                <span className="truncate">Teacher / Faculty</span>
               </Button>
               <Button
                 variant="outline"
@@ -128,7 +168,7 @@ export default function LoginPage() {
                 className="justify-start text-xs h-9 hover:border-primary"
                 onClick={() => handleQuickPersona("FINANCE")}
               >
-                <Sparkles className="h-3.5 w-3.5 text-amber-600 mr-1.5 shrink-0" />
+                <Coins className="h-3.5 w-3.5 text-emerald-600 mr-1.5 shrink-0" />
                 <span className="truncate">Finance Officer</span>
               </Button>
               <Button
@@ -137,8 +177,8 @@ export default function LoginPage() {
                 className="justify-start text-xs h-9 hover:border-primary"
                 onClick={() => handleQuickPersona("OFFICE")}
               >
-                <KeyRound className="h-3.5 w-3.5 text-blue-600 mr-1.5 shrink-0" />
-                <span className="truncate">Office Staff</span>
+                <Briefcase className="h-3.5 w-3.5 text-amber-500 mr-1.5 shrink-0" />
+                <span className="truncate">Admin Office</span>
               </Button>
               <Button
                 variant="outline"
@@ -146,7 +186,7 @@ export default function LoginPage() {
                 className="justify-start text-xs h-9 hover:border-primary"
                 onClick={() => handleQuickPersona("PARENT")}
               >
-                <UserCheck className="h-3.5 w-3.5 text-purple-600 mr-1.5 shrink-0" />
+                <Users className="h-3.5 w-3.5 text-purple-500 mr-1.5 shrink-0" />
                 <span className="truncate">Parent / Guardian</span>
               </Button>
               <Button
@@ -155,25 +195,22 @@ export default function LoginPage() {
                 className="justify-start text-xs h-9 hover:border-primary"
                 onClick={() => handleQuickPersona("STUDENT")}
               >
-                <GraduationCap className="h-3.5 w-3.5 text-indigo-600 mr-1.5 shrink-0" />
-                <span className="truncate">Enrolled Student</span>
+                <GraduationCap className="h-3.5 w-3.5 text-teal-500 mr-1.5 shrink-0" />
+                <span className="truncate">Student</span>
               </Button>
             </div>
           </div>
         </CardContent>
-        <CardFooter className="flex flex-col gap-2 pt-0">
-          <Button
-            variant="ghost"
-            className="w-full text-xs text-muted-foreground hover:text-foreground"
-            onClick={() => handleQuickPersona("ADMIN")}
-          >
-            🔒 Sign in with Keycloak OpenID Connect SSO
-          </Button>
-          <div className="text-xs text-center text-muted-foreground pt-1 border-t w-full">
-            Don't have an institutional account?{" "}
+        <CardFooter className="flex flex-col space-y-2 border-t pt-4 text-center">
+          <p className="text-xs text-muted-foreground">
+            Need an institutional account?{" "}
             <Link href="/signup" className="text-primary font-semibold hover:underline">
-              Create an Account
+              Create an account
             </Link>
+          </p>
+          <div className="flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground">
+            <Lock className="h-3 w-3" />
+            <span>Protected by Keycloak RBAC & Row-Level Scope (RLS)</span>
           </div>
         </CardFooter>
       </Card>
