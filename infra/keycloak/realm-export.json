@@ -5,6 +5,42 @@
   "registrationAllowed": false,
   "resetPasswordAllowed": true,
   "rememberMe": true,
+  "verifyEmail": true,
+  "identityProviders": [
+    {
+      "alias": "google",
+      "displayName": "Google Workspace / Gmail",
+      "providerId": "google",
+      "enabled": true,
+      "updateProfileFirstLoginMode": "on",
+      "trustEmail": true,
+      "storeToken": false,
+      "addReadTokenRoleOnCreate": false,
+      "authenticateByDefault": false,
+      "linkOnly": false,
+      "firstBrokerLoginFlowAlias": "first broker login",
+      "config": {
+        "clientId": "google-client-id-placeholder",
+        "clientSecret": "google-client-secret-placeholder",
+        "defaultScope": "openid profile email"
+      }
+    }
+  ],
+  "requiredActions": [
+    { "alias": "CONFIGURE_TOTP", "name": "Configure OTP", "providerId": "CONFIGURE_TOTP", "enabled": true, "defaultAction": false, "priority": 10 },
+    { "alias": "UPDATE_PASSWORD", "name": "Update Password", "providerId": "UPDATE_PASSWORD", "enabled": true, "defaultAction": false, "priority": 30 },
+    { "alias": "VERIFY_EMAIL", "name": "Verify Email", "providerId": "VERIFY_EMAIL", "enabled": true, "defaultAction": false, "priority": 50 }
+  ],
+  "smtpServer": {
+    "host": "smtp.gmail.com",
+    "port": "587",
+    "starttls": "true",
+    "auth": "true",
+    "from": "noreply@school.edu.bd",
+    "fromDisplayName": "Dhaka Model College Portal",
+    "user": "smtp-user",
+    "password": "smtp-password"
+  },
   "roles": {
     "realm": [
       { "name": "ADMIN", "description": "Administrator / Principal" },

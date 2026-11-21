@@ -37,6 +37,16 @@ export class StudentController {
     return this.service.createStudent(dto, user.id, user.roles[0]);
   }
 
+  @Post("import")
+  @Roles("ADMIN", "OFFICE")
+  @ApiOperation({ summary: "Bulk import students from CSV" })
+  async importStudents(
+    @Body() body: { students: any[] },
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.service.importStudents(body.students || [], user.id, user.roles[0]);
+  }
+
   @Post("enroll")
   @Roles("ADMIN", "OFFICE")
   @ApiOperation({ summary: "Enroll student into section" })

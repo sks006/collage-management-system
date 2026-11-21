@@ -30,6 +30,18 @@ export class StudentRepository {
     return row;
   }
 
+  async createMany(dataList: (typeof student.$inferInsert)[]) {
+    if (dataList.length === 0) return [];
+    const chunkSize = 500;
+    const inserted: (typeof student.$inferSelect)[] = [];
+    for (let i = 0; i < dataList.length; i += chunkSize) {
+      const chunk = dataList.slice(i, i + chunkSize);
+      const rows = await this.db.insert(student).values(chunk).returning();
+      inserted.push(...rows);
+    }
+    return inserted;
+  }
+
   async enroll(data: typeof enrollment.$inferInsert) {
     const [row] = await this.db.insert(enrollment).values(data).returning();
     return row;

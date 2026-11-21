@@ -8,6 +8,8 @@ build/
 .next/
 out/
 tmp/
+packages/*/src/**/*.js
+packages/*/src/**/*.js.map
 
 # Logs
 npm-debug.log*

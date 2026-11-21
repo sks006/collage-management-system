@@ -1,6 +1,6 @@
 import { Injectable, Inject } from "@nestjs/common";
 import { DATABASE_CONNECTION } from "../../../shared/database/database.provider";
-import { DatabaseInstance, leaveRequest, calendarDay, leaveType } from "@sms/database";
+import { DatabaseInstance, leaveRequest, calendarDay, leaveType, substitution } from "@sms/database";
 import { eq } from "drizzle-orm";
 
 @Injectable()
@@ -30,6 +30,18 @@ export class LeaveRepository {
       .where(eq(leaveRequest.id, id))
       .returning();
     return row;
+  }
+
+  async createSubstitution(data: typeof substitution.$inferInsert) {
+    const [row] = await this.db.insert(substitution).values(data).returning();
+    return row;
+  }
+
+  async findSubstitutions(staffId?: string) {
+    if (staffId) {
+      return this.db.select().from(substitution).where(eq(substitution.substituteStaffId, staffId));
+    }
+    return this.db.select().from(substitution);
   }
 
   async createCalendarDay(data: typeof calendarDay.$inferInsert) {

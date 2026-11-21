@@ -3,6 +3,7 @@ import { ApiTags, ApiBearerAuth, ApiOperation } from "@nestjs/swagger";
 import { PaymentService } from "../services/payment.service";
 import { JwtAuthGuard } from "../../../shared/guards/jwt.guard";
 import { RolesGuard } from "../../../shared/guards/roles.guard";
+import { Roles } from "../../../shared/decorators/roles.decorator";
 import { ZodValidationPipe } from "../../../shared/pipes/zod-validation.pipe";
 import { initiatePaymentSchema, ipnWebhookSchema } from "@sms/shared";
 

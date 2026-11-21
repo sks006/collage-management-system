@@ -56,8 +56,11 @@ export class AcademicController {
   @Post("sections")
   @Roles("ADMIN", "PRINCIPAL")
   @ApiOperation({ summary: "Create section" })
-  async createSection(@Body(new ZodValidationPipe(createSectionSchema)) dto: any) {
-    return this.service.createSection(dto);
+  async createSection(
+    @Body(new ZodValidationPipe(createSectionSchema)) dto: any,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.service.createSection(dto, user.id, user.roles[0]);
   }
 
   @Post("teacher-assignments")

@@ -41,4 +41,14 @@ export class PayrollController {
   async getLines(@Param("id") id: string) {
     return this.service.getRunLines(id);
   }
+
+  @Post("failed-lines/:id/retry")
+  @Roles("FINANCE", "ADMIN")
+  @ApiOperation({ summary: "Retry failed electronic bank transfer line" })
+  async retryFailedLine(
+    @Param("id") id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.service.retryFailedLine(id, user.id, user.roles[0]);
+  }
 }

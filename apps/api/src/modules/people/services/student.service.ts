@@ -30,6 +30,22 @@ export class StudentService {
     return created;
   }
 
+  async importStudents(students: any[], actorId: string, actorRole: string) {
+    const inserted = await this.repo.createMany(students);
+    await this.audit.log({
+      actorId,
+      actorRole,
+      action: "BULK_IMPORT",
+      resourceType: "student",
+      resourceId: "bulk",
+      newValue: { count: inserted.length },
+    });
+    return {
+      total: students.length,
+      imported: inserted.length,
+    };
+  }
+
   async enrollStudent(data: any) {
     return this.repo.enroll(data);
   }

@@ -47,4 +47,20 @@ export class LeaveController {
   async addCalendarDay(@Body(new ZodValidationPipe(createCalendarDaySchema)) dto: any) {
     return this.service.addCalendarDay(dto);
   }
+
+  @Post("substitutions")
+  @Roles("ADMIN", "PRINCIPAL", "OFFICE")
+  @ApiOperation({ summary: "Assign substitute teacher for approved leave" })
+  async assignSubstitution(
+    @Body() dto: any,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.service.createSubstitution(dto, user.id, user.roles[0]);
+  }
+
+  @Get("substitutions")
+  @ApiOperation({ summary: "List assigned teacher substitutions" })
+  async listSubstitutions(@Query("staffId") staffId?: string) {
+    return this.service.getSubstitutions(staffId);
+  }
 }

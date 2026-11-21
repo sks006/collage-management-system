@@ -3,7 +3,7 @@ export async function apiClient<T>(
   options: RequestInit = {},
 ): Promise<T> {
   const baseUrl = typeof window === "undefined"
-    ? process.env.API_URL || "http://localhost:4000"
+    ? process.env["API_URL"] || "http://localhost:4000"
     : "";
 
   const url = `${baseUrl}/api/v1${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;

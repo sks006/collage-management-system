@@ -1,4 +1,4 @@
-import { pgSchema, uuid, text, smallint, timestamp, date, jsonb, primaryKey, uniqueIndex, index } from "drizzle-orm/pg-core";
+import { pgSchema, uuid, text, smallint, timestamp, date, jsonb, primaryKey, uniqueIndex, index, numeric } from "drizzle-orm/pg-core";
 import { student } from "./people";
 import { section, subject } from "./academic";
 

@@ -7,7 +7,7 @@ export class ResponseInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const req = context.switchToHttp().getRequest();
     return next.handle().pipe(
-      map((data) => {
+      map((data: any) => {
         // If data is already in standard format, return directly
         if (data && typeof data === "object" && "success" in data) {
           return data;

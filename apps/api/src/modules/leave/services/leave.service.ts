@@ -30,6 +30,23 @@ export class LeaveService {
     return row;
   }
 
+  async createSubstitution(data: any, actorId: string, actorRole: string) {
+    const row = await this.repo.createSubstitution(data);
+    await this.audit.log({
+      actorId,
+      actorRole,
+      action: "ASSIGN_SUBSTITUTION",
+      resourceType: "substitution",
+      resourceId: row.id,
+      newValue: row,
+    });
+    return row;
+  }
+
+  async getSubstitutions(staffId?: string) {
+    return this.repo.findSubstitutions(staffId);
+  }
+
   async getCalendar(yearId: string) {
     return this.repo.getCalendarDays(yearId);
   }
