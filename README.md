@@ -290,33 +290,6 @@ pnpm dev:worker
 # Polls PostgreSQL Outbox table
 ```
 
----
-
-## Institutional Seed Personas & Default Credentials
-
-All pre-seeded institutional accounts are provisioned in Keycloak realm `sms` and linked to `people.staff` and `people.student` in PostgreSQL.
-
-**Universal Default Password for All Seed Accounts:** `College@2026`
-
-| Name | Role | Email | Designation / Department |
-|---|---|---|---|
-| **Dr. Rafiqul Islam** | `ADMIN` / `PRINCIPAL` | `principal@dhakamodel.edu.bd` | Principal, Administration |
-| **Dr. Mohammad Harun** | `PRINCIPAL` | `viceprincipal@dhakamodel.edu.bd` | Vice Principal, Administration |
-| **Rahim Ahmed** | `TEACHER` | `rahim.physics@dhakamodel.edu.bd` | Senior Lecturer, Physics |
-| **Nasrin Sultana** | `TEACHER` | `nasrin.chem@dhakamodel.edu.bd` | Lecturer, Chemistry |
-| **Tariqul Alam** | `TEACHER` | `tariqul.math@dhakamodel.edu.bd` | Assistant Professor, Mathematics |
-| **Farhana Yasmin** | `OFFICE` | `admissions@dhakamodel.edu.bd` | Head Admin Officer, Admissions |
-| **Kamal Hossain** | `FINANCE` | `finance@dhakamodel.edu.bd` | Chief Accounts Officer, Finance |
-| **Anisur Rahman** | `TEACHER` | `anis.english@dhakamodel.edu.bd` | Lecturer, English |
-| **Mahmuda Begum** | `TEACHER` | `mahmuda.bangla@dhakamodel.edu.bd` | Senior Lecturer, Bangla |
-| **Jahidul Islam** | `OFFICE` | `it.admin@dhakamodel.edu.bd` | IT Systems Coordinator, IT |
-| **Tanvir Hasan** | `STUDENT` | `tanvir.student@dhakamodel.edu.bd` | Class 12, Science (Roll 101) |
-| **Nusrat Jahan** | `STUDENT` | `nusrat.student@dhakamodel.edu.bd` | Class 12, Science (Roll 102) |
-| **Sadman Sakib** | `STUDENT` | `sadman.student@dhakamodel.edu.bd` | Class 12, Science (Roll 103) |
-| **Mehnaz Tabassum** | `STUDENT` | `mehnaz.student@dhakamodel.edu.bd` | Class 11, Commerce (Roll 201) |
-
----
-
 ## SMTP Notification & Gmail Service Configuration
 
 The background worker dispatches registration OTPs and institutional alerts via Nodemailer SMTP.
