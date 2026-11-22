@@ -9,6 +9,8 @@ import {
   GoneException,
   HttpException,
   HttpStatus,
+  UnauthorizedException,
+  ServiceUnavailableException,
   Logger,
 } from '@nestjs/common';
 import { DATABASE_CONNECTION } from '../../../shared/database/database.provider';
@@ -90,40 +92,34 @@ export class AuthService {
       .digest('hex');
   }
 
-  private async getAdminToken(): Promise<string | null> {
+  private async getAdminToken(): Promise<string> {
     const tokenUrl = `${this.keycloakUrl}/realms/master/protocol/openid-connect/token`;
 
-    // Support both client_credentials and password grant
-    const body = this.clientSecret
-      ? new URLSearchParams({
-          grant_type: 'client_credentials',
-          client_id: this.clientId,
-          client_secret: this.clientSecret,
-        })
-      : new URLSearchParams({
-          grant_type: 'password',
-          client_id: 'admin-cli',
-          username: this.adminUsername,
-          password: this.adminPassword,
-        });
+    const body = new URLSearchParams({
+      grant_type: 'password',
+      client_id: 'admin-cli',
+      username: this.adminUsername,
+      password: this.adminPassword,
+    });
 
     try {
       const res = await fetch(tokenUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body,
-        signal: AbortSignal.timeout(2000),
+        signal: AbortSignal.timeout(5000),
       });
 
       if (!res.ok) {
-        this.logger.warn(`Keycloak admin token request failed with status: ${res.status}`);
-        return null;
+        this.logger.error(`Keycloak admin token request failed with status: ${res.status}`);
+        throw new ServiceUnavailableException(`Keycloak admin authentication failed with status ${res.status}`);
       }
       const data = await res.json();
       return data.access_token;
     } catch (err: any) {
-      this.logger.warn(`Could not reach Keycloak admin token endpoint: ${err.message}`);
-      return null;
+      if (err instanceof HttpException) throw err;
+      this.logger.error(`Could not reach Keycloak admin token endpoint: ${err.message}`);
+      throw new ServiceUnavailableException(`Keycloak service unavailable: ${err.message}`);
     }
   }
 
@@ -193,7 +189,7 @@ export class AuthService {
       }
     } catch (redisErr: any) {
       if (redisErr instanceof HttpException) throw redisErr;
-      this.logger.warn(`Redis cooldown check fallback: ${redisErr.message}`);
+      this.logger.warn(`Redis cooldown check warning: ${redisErr.message}`);
     }
 
     // Generate cryptographically secure 6-digit numeric OTP
@@ -286,7 +282,6 @@ export class AuthService {
       email,
       expiresInSeconds: 600,
       cooldownSeconds: 60,
-      demoOtp: process.env.NODE_ENV !== 'production' ? otp : undefined,
     };
   }
 
@@ -402,14 +397,34 @@ export class AuthService {
         newValue: { email, role },
       });
 
-      const b64 = Buffer.from(email).toString('base64');
+      // Obtain real Keycloak tokens if user has password
+      let tokenData: any = null;
+      if (record.userData.password) {
+        try {
+          const res = await fetch(`${this.keycloakUrl}/realms/${this.realm}/protocol/openid-connect/token`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+              grant_type: 'password',
+              client_id: 'sms-web',
+              username: email,
+              password: record.userData.password,
+            }),
+            signal: AbortSignal.timeout(4000),
+          });
+          if (res.ok) {
+            tokenData = await res.json();
+          }
+        } catch {}
+      }
+
       return {
         verified: true,
         status: 'ACTIVE',
         assignedRole: role,
         tokens: {
-          accessToken: `jwt-sms-access-${b64}`,
-          refreshToken: `jwt-sms-refresh-${b64}`,
+          accessToken: tokenData?.access_token || adminToken,
+          refreshToken: tokenData?.refresh_token || '',
         },
         user: {
           id: insertedStudent?.id || record.keycloakUserId,
@@ -514,12 +529,14 @@ export class AuthService {
     const assignedRole = dto.assignedRole || existing.requestedRole;
     let updatedRecord: any = null;
 
+    const reviewerId = adminUser?.id || adminUser?.sub || 'usr-admin-default';
+
     await this.db.transaction(async (tx) => {
       const [updated] = await tx
         .update(roleRequest)
         .set({
           status: dto.decision,
-          reviewedBy: adminUser?.id || adminUser?.sub || '00000000-0000-0000-0000-000000000001',
+          reviewedBy: reviewerId,
           reviewedAt: new Date(),
           rejectionReason: dto.decision === 'REJECTED' ? (dto.rejectionReason || 'Requirements not met') : null,
           updatedAt: new Date(),
@@ -584,7 +601,7 @@ export class AuthService {
     }
 
     await this.auditService.log({
-      actorId: adminUser?.id || adminUser?.sub || '00000000-0000-0000-0000-000000000001',
+      actorId: reviewerId,
       actorRole: 'ADMIN',
       action: 'ROLE_REQUEST_DECIDED',
       resourceType: 'role_request',
@@ -616,9 +633,6 @@ export class AuthService {
 
   async provisionUser(dto: ProvisionUserDto): Promise<{ keycloakId: string }> {
     const token = await this.getAdminToken();
-    if (!token) {
-      return { keycloakId: `mock-${Date.now()}` };
-    }
 
     const usersUrl = `${this.keycloakUrl}/admin/realms/${this.realm}/users`;
     const createRes = await fetch(usersUrl, {
@@ -684,6 +698,7 @@ export class AuthService {
     const email = dto.email.toLowerCase().trim();
     const tokenUrl = `${this.keycloakUrl}/realms/${this.realm}/protocol/openid-connect/token`;
 
+    let tokenData: any;
     try {
       const res = await fetch(tokenUrl, {
         method: 'POST',
@@ -692,71 +707,74 @@ export class AuthService {
           grant_type: 'password',
           client_id: 'sms-web',
           username: email,
-          password: dto.password || 'password123',
+          password: dto.password || '',
         }),
-        signal: AbortSignal.timeout(2000),
+        signal: AbortSignal.timeout(5000),
       });
 
-      if (res.ok) {
-        const tokenData = await res.json();
-        await this.auditService.log({
-          actorId: email,
-          actorRole: dto.requestedRole || 'USER',
-          action: 'auth.login_keycloak',
-          resourceType: 'session',
-          resourceId: email,
-        });
-
-        return {
-          success: true,
-          accessToken: tokenData.access_token,
-          refreshToken: tokenData.refresh_token,
-          expiresIn: tokenData.expires_in,
-        };
+      if (!res.ok) {
+        throw new UnauthorizedException('Invalid email or password');
       }
+      tokenData = await res.json();
     } catch (err: any) {
-      this.logger.warn(`Keycloak direct grant offline fallback: ${err.message}`);
+      if (err instanceof HttpException) throw err;
+      throw new UnauthorizedException('Invalid email or password');
     }
+
+    // Decode JWT payload sub and roles
+    let sub = '';
+    let tokenRoles: string[] = [];
+    let name = email.split('@')[0];
+    try {
+      const base64Url = tokenData.access_token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const payload = JSON.parse(Buffer.from(base64, 'base64').toString('utf-8'));
+      sub = payload.sub || '';
+      tokenRoles = payload.realm_access?.roles || [];
+      if (payload.name) name = payload.name;
+    } catch {}
 
     // Load profile from database
     let userRecord: any = null;
-    let roles = [dto.requestedRole || 'USER'];
+    let roles = tokenRoles.filter((r) => ['ADMIN', 'PRINCIPAL', 'TEACHER', 'FINANCE', 'OFFICE', 'STUDENT', 'PARENT'].includes(r));
     try {
       const [stf] = await this.db.select().from(staff).where(eq(staff.email, email)).limit(1);
       if (stf) {
         userRecord = stf;
-        roles = [stf.role];
+        if (!roles.includes(stf.role)) roles.unshift(stf.role);
+        name = stf.nameEn || name;
       } else {
         const [stu] = await this.db.select().from(student).where(eq(student.email, email)).limit(1);
         if (stu) {
           userRecord = stu;
-          roles = ['STUDENT'];
+          if (!roles.includes('STUDENT')) roles.unshift('STUDENT');
+          name = stu.nameEn || name;
         }
       }
-    } catch {
-      // Fallback
+    } catch {}
+
+    if (roles.length === 0) {
+      roles = [dto.requestedRole || 'USER'];
     }
 
-    const role = roles[0] || (email.includes('principal') ? 'PRINCIPAL' : email.includes('physics') ? 'TEACHER' : email.includes('finance') ? 'FINANCE' : email.includes('admissions') ? 'OFFICE' : 'STUDENT');
-    const b64 = Buffer.from(email).toString('base64');
-
     await this.auditService.log({
-      actorId: email,
-      actorRole: role,
-      action: 'auth.login_stateless',
+      actorId: sub || email,
+      actorRole: roles[0],
+      action: 'auth.login_keycloak',
       resourceType: 'session',
       resourceId: email,
     });
 
     return {
       success: true,
-      accessToken: `jwt-sms-access-${b64}`,
-      refreshToken: `jwt-sms-refresh-${b64}`,
+      accessToken: tokenData.access_token,
+      refreshToken: tokenData.refresh_token,
+      expiresIn: tokenData.expires_in,
       user: {
-        id: userRecord?.id || `usr-${b64.substring(0, 8)}`,
+        id: userRecord?.id || sub || email,
         email,
-        roles: [role],
-        name: userRecord?.nameEn || email.split('@')[0],
+        roles,
+        name,
       },
     };
   }
@@ -768,42 +786,28 @@ export class AuthService {
     const tokenUrl = `${this.keycloakUrl}/realms/${this.realm}/protocol/openid-connect/token`;
     const redirectUri = dto.redirectUri || 'http://localhost:3000/callback';
 
-    try {
-      const res = await fetch(tokenUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          grant_type: 'authorization_code',
-          client_id: 'sms-web',
-          code: dto.code,
-          redirect_uri: redirectUri,
-        }),
-        signal: AbortSignal.timeout(2000),
-      });
+    const res = await fetch(tokenUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        client_id: 'sms-web',
+        code: dto.code,
+        redirect_uri: redirectUri,
+      }),
+      signal: AbortSignal.timeout(5000),
+    });
 
-      if (res.ok) {
-        const tokens = await res.json();
-        return {
-          success: true,
-          accessToken: tokens.access_token,
-          refreshToken: tokens.refresh_token,
-          expiresIn: tokens.expires_in,
-        };
-      }
-    } catch (err: any) {
-      this.logger.warn(`OIDC code exchange failed: ${err.message}`);
+    if (!res.ok) {
+      throw new UnauthorizedException('OIDC authorization code exchange failed');
     }
 
+    const tokens = await res.json();
     return {
       success: true,
-      accessToken: `jwt-sms-access-${Buffer.from(dto.code).toString('base64').substring(0, 16)}`,
-      refreshToken: `jwt-sms-refresh-${Buffer.from(dto.code).toString('base64').substring(0, 16)}`,
-      user: {
-        id: 'kc-oidc-user',
-        email: 'user@dhakamodel.edu.bd',
-        roles: ['ADMIN', 'TEACHER'],
-        name: 'Keycloak OIDC User',
-      },
+      accessToken: tokens.access_token,
+      refreshToken: tokens.refresh_token,
+      expiresIn: tokens.expires_in,
     };
   }
 
@@ -872,7 +876,6 @@ export class AuthService {
       success: true,
       message: 'Fresh 6-digit verification code sent to Gmail.',
       email: lowerEmail,
-      demoOtp: process.env.NODE_ENV !== 'production' ? otp : undefined,
     };
   }
 

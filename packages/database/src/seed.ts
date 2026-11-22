@@ -15,6 +15,152 @@ import { periodEvent, dailySummary, periodClose } from "./schema/attendance";
 import { payrollRun, payrollLine } from "./schema/payroll";
 import { eq, and, sql } from "drizzle-orm";
 
+async function getKeycloakAdminToken(): Promise<string | null> {
+  const keycloakUrl = process.env.KEYCLOAK_URL || "http://127.0.0.1:8080";
+  const tokenUrl = `${keycloakUrl}/realms/master/protocol/openid-connect/token`;
+  try {
+    const res = await fetch(tokenUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "password",
+        client_id: "admin-cli",
+        username: process.env.KEYCLOAK_ADMIN_USERNAME || "admin",
+        password: process.env.KEYCLOAK_ADMIN_PASSWORD || "admin",
+      }),
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) {
+      console.warn(`  ! Keycloak token response not OK: status ${res.status}`);
+      return null;
+    }
+    const data = await res.json();
+    return data.access_token;
+  } catch (err: any) {
+    console.warn(`  ! Keycloak master admin login notice: ${err.message}`);
+    return null;
+  }
+}
+
+async function ensureKeycloakUser(
+  adminToken: string,
+  user: {
+    email: string;
+    firstName: string;
+    lastName: string;
+    roles: string[];
+    password?: string;
+  }
+): Promise<string | null> {
+  const keycloakUrl = process.env.KEYCLOAK_URL || "http://127.0.0.1:8080";
+  const realm = process.env.KEYCLOAK_REALM || "sms";
+  const usersUrl = `${keycloakUrl}/admin/realms/${realm}/users`;
+  const defaultPassword = user.password || "College@2026";
+
+  try {
+    // 1. Search if user exists
+    const searchRes = await fetch(`${usersUrl}?email=${encodeURIComponent(user.email)}`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
+      signal: AbortSignal.timeout(4000),
+    });
+    let userId: string | null = null;
+    if (searchRes.ok) {
+      const users = await searchRes.json();
+      if (Array.isArray(users) && users.length > 0) {
+        userId = users[0].id;
+      }
+    }
+
+    // 2. If not found, create user
+    if (!userId) {
+      const createRes = await fetch(usersUrl, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          username: user.email,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          enabled: true,
+          emailVerified: true,
+          credentials: [
+            {
+              type: "password",
+              value: defaultPassword,
+              temporary: false,
+            },
+          ],
+        }),
+        signal: AbortSignal.timeout(4000),
+      });
+
+      if (createRes.ok || createRes.status === 201) {
+        const location = createRes.headers.get("location");
+        if (location) {
+          userId = location.split("/").pop() || null;
+        }
+      }
+      if (!userId) {
+        const recheck = await fetch(`${usersUrl}?email=${encodeURIComponent(user.email)}`, {
+          headers: { Authorization: `Bearer ${adminToken}` },
+          signal: AbortSignal.timeout(4000),
+        });
+        if (recheck.ok) {
+          const list = await recheck.json();
+          if (list[0]) userId = list[0].id;
+        }
+      }
+    }
+
+    // 3. Reset password to ensure known password
+    if (userId) {
+      await fetch(`${usersUrl}/${userId}/reset-password`, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          type: "password",
+          value: defaultPassword,
+          temporary: false,
+        }),
+        signal: AbortSignal.timeout(4000),
+      });
+
+      // 4. Assign Realm Roles
+      for (const roleName of user.roles) {
+        try {
+          const roleRes = await fetch(`${keycloakUrl}/admin/realms/${realm}/roles/${encodeURIComponent(roleName)}`, {
+            headers: { Authorization: `Bearer ${adminToken}` },
+            signal: AbortSignal.timeout(4000),
+          });
+          if (roleRes.ok) {
+            const roleObj = await roleRes.json();
+            await fetch(`${usersUrl}/${userId}/role-mappings/realm`, {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${adminToken}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify([roleObj]),
+              signal: AbortSignal.timeout(4000),
+            });
+          }
+        } catch {}
+      }
+    }
+
+    return userId;
+  } catch (err: any) {
+    console.warn(`  ! Keycloak sync for ${user.email} notice: ${err.message}`);
+    return null;
+  }
+}
+
 async function seed() {
   const connectionString =
     process.env.DATABASE_ADMIN_URL ||
@@ -27,6 +173,12 @@ async function seed() {
 
   try {
     console.log("[Seed] Starting idempotent database seed for Dhaka Model College...");
+    const adminToken = await getKeycloakAdminToken();
+    if (adminToken) {
+      console.log("  * Successfully authenticated with Keycloak Admin API.");
+    } else {
+      console.log("  ! Keycloak Admin API unavailable - continuing with PostgreSQL seed.");
+    }
 
     // 1. ACADEMIC SCHEMA
     console.log("[Seed] 1. Seeding Academic Year & Terms...");
@@ -302,10 +454,26 @@ async function seed() {
 
     const seededStaff: Record<string, any> = {};
     for (const st of staffList) {
+      const firstName = st.nameEn.split(" ")[0] || st.nameEn;
+      const lastName = st.nameEn.split(" ").slice(1).join(" ") || "";
+      const roles = st.role === "ADMIN" ? ["ADMIN", "PRINCIPAL"] : [st.role];
+      const keycloakUserId = adminToken
+        ? await ensureKeycloakUser(adminToken, {
+            email: st.email,
+            firstName,
+            lastName,
+            roles,
+          })
+        : null;
+
       let [stf] = await db.select().from(staff).where(eq(staff.employeeNo, st.employeeNo));
       if (!stf) {
-        [stf] = await db.insert(staff).values(st).returning();
-        console.log(`  + Created Staff: ${st.nameEn} (${st.employeeNo} - ${st.role})`);
+        [stf] = await db.insert(staff).values({ ...st, keycloakUserId }).returning();
+        console.log(`  + Created Staff: ${st.nameEn} (${st.employeeNo} - ${st.role}) [KC: ${keycloakUserId || 'offline'}]`);
+      } else if (keycloakUserId && stf.keycloakUserId !== keycloakUserId) {
+        await db.update(staff).set({ keycloakUserId }).where(eq(staff.id, stf.id));
+        stf.keycloakUserId = keycloakUserId;
+        console.log(`  = Linked Staff Keycloak ID: ${st.nameEn} [KC: ${keycloakUserId}]`);
       }
       seededStaff[st.employeeNo] = stf;
     }
@@ -483,6 +651,27 @@ async function seed() {
 
     const seededStudents: Record<string, any> = {};
     for (const s of studentList) {
+      const firstName = s.nameEn.split(" ")[0] || s.nameEn;
+      const lastName = s.nameEn.split(" ").slice(1).join(" ") || "";
+      const keycloakUserId = adminToken
+        ? await ensureKeycloakUser(adminToken, {
+            email: s.email,
+            firstName,
+            lastName,
+            roles: ["STUDENT"],
+          })
+        : null;
+
+      let guardianKeycloakId: string | null = null;
+      if (adminToken && s.guardianEmail) {
+        guardianKeycloakId = await ensureKeycloakUser(adminToken, {
+          email: s.guardianEmail,
+          firstName: s.guardianName.split(" ")[0] || s.guardianName,
+          lastName: s.guardianName.split(" ").slice(1).join(" ") || "Guardian",
+          roles: ["PARENT"],
+        });
+      }
+
       let [stu] = await db.select().from(student).where(eq(student.admissionNo, s.admissionNo));
       if (!stu) {
         [stu] = await db
@@ -498,11 +687,27 @@ async function seed() {
             guardianName: s.guardianName,
             guardianPhone: s.guardianPhone,
             guardianEmail: s.guardianEmail,
+            guardianKeycloakId,
+            keycloakUserId,
             sessionYear: s.sessionYear,
             status: "ACTIVE",
           })
           .returning();
-        console.log(`  + Created Student: ${s.nameEn} (${s.admissionNo})`);
+        console.log(`  + Created Student: ${s.nameEn} (${s.admissionNo}) [KC: ${keycloakUserId || 'offline'}]`);
+      } else if (
+        (keycloakUserId && stu.keycloakUserId !== keycloakUserId) ||
+        (guardianKeycloakId && stu.guardianKeycloakId !== guardianKeycloakId)
+      ) {
+        await db
+          .update(student)
+          .set({
+            keycloakUserId: keycloakUserId || stu.keycloakUserId,
+            guardianKeycloakId: guardianKeycloakId || stu.guardianKeycloakId,
+          })
+          .where(eq(student.id, stu.id));
+        stu.keycloakUserId = keycloakUserId || stu.keycloakUserId;
+        stu.guardianKeycloakId = guardianKeycloakId || stu.guardianKeycloakId;
+        console.log(`  = Linked Student Keycloak ID: ${s.nameEn} [KC: ${keycloakUserId}]`);
       }
       seededStudents[s.admissionNo] = stu;
 

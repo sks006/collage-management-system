@@ -66,7 +66,7 @@ export default function LeavePage() {
         </Button>
       </div>
 
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
         <Card className="shadow-sm">
           <CardHeader className="pb-1">
             <CardTitle className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Casual Leave (CL)</CardTitle>

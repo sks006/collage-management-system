@@ -92,7 +92,7 @@ export function AppSidebar({
             title="Dhaka Model College"
             className="flex items-center gap-2.5 min-w-0 flex-1 hover:opacity-90 transition-opacity group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:flex-none"
           >
-            <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold shrink-0 shadow-xs">
+            <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold shrink-0 shadow-sm">
               🏫
             </div>
             <div className="flex flex-col gap-0.5 leading-none min-w-0 group-data-[collapsible=icon]:hidden">
@@ -167,7 +167,7 @@ export function AppSidebar({
       </SidebarContent>
 
       {/* Footer */}
-      <SidebarFooter className="border-t border-sidebar-border p-2 group-data-[collapsible=icon]:p-2">
+      <SidebarFooter className="border-t border-sidebar-border p-2 group-data-[collapsible=icon]:p-2 shrink-0">
         <SidebarMenu className="group-data-[collapsible=icon]:items-center">
           <SidebarMenuItem className="group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
             <SidebarMenuButton

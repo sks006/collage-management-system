@@ -4,15 +4,15 @@ import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { useAuth, DEMO_PERSONAS } from "@/lib/auth-context";
+import { useAuth } from "@/lib/auth-context";
 import { authService } from "@/services/auth.service";
-import { ShieldCheck, Loader2, AlertCircle, ArrowRight } from "lucide-react";
+import { ShieldCheck, Loader2, AlertCircle } from "lucide-react";
 
 function KeycloakCallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { setSession } = useAuth();
-  const [status, setStatus] = React.useState<"processing" | "success" | "fallback">("processing");
+  const [status, setStatus] = React.useState<"processing" | "success" | "error">("processing");
   const [statusMessage, setStatusMessage] = React.useState("Exchanging authorization code with Keycloak...");
 
   const code = searchParams.get("code");
@@ -25,7 +25,7 @@ function KeycloakCallbackContent() {
     async function handleExchange() {
       if (error) {
         if (isMounted) {
-          setStatus("fallback");
+          setStatus("error");
           setStatusMessage(errorDescription || `Keycloak returned error: ${error}`);
         }
         return;
@@ -33,7 +33,7 @@ function KeycloakCallbackContent() {
 
       if (!code) {
         if (isMounted) {
-          setStatus("fallback");
+          setStatus("error");
           setStatusMessage("No authorization code found in callback query parameters.");
         }
         return;
@@ -103,15 +103,14 @@ function KeycloakCallbackContent() {
             setTimeout(() => router.push("/"), 800);
           }
         } else {
-          // If Keycloak container is offline or rejected code
           if (isMounted) {
-            setStatus("fallback");
-            setStatusMessage("Keycloak token exchange could not be completed (Keycloak service might be offline or code expired).");
+            setStatus("error");
+            setStatusMessage("Keycloak token exchange could not be completed.");
           }
         }
       } catch (err: any) {
         if (isMounted) {
-          setStatus("fallback");
+          setStatus("error");
           setStatusMessage(`Keycloak connection issue: ${err.message || "Failed to reach Keycloak server"}`);
         }
       }
@@ -123,11 +122,6 @@ function KeycloakCallbackContent() {
       isMounted = false;
     };
   }, [code, error, errorDescription, router, setSession]);
-
-  const handleUseDemoAdmin = () => {
-    setSession(DEMO_PERSONAS["ADMIN"]!);
-    router.push("/");
-  };
 
   return (
     <Card className="shadow-xl border-primary/20">
@@ -151,26 +145,18 @@ function KeycloakCallbackContent() {
           </p>
         )}
 
-        {status === "fallback" && (
+        {status === "error" && (
           <div className="space-y-4">
             <div className="p-3 text-xs bg-muted/60 rounded-md text-left text-muted-foreground border">
               <p className="font-semibold text-foreground mb-1">Keycloak OIDC Flow Information:</p>
               <p>Realm: <code className="text-primary font-mono">sms</code></p>
               <p>Client ID: <code className="text-primary font-mono">sms-web</code></p>
               {code && <p className="truncate">Auth Code: <code className="font-mono">{code.substring(0, 20)}...</code></p>}
-              <p className="mt-2 text-[11px] text-muted-foreground">
-                You can proceed immediately using the pre-configured Institutional Principal / Admin persona.
-              </p>
             </div>
 
-            <div className="flex flex-col gap-2">
-              <Button onClick={handleUseDemoAdmin} className="w-full">
-                Continue with Admin Persona <ArrowRight className="h-4 w-4 ml-1.5" />
-              </Button>
-              <Button variant="outline" onClick={() => router.push("/login")} className="w-full">
-                Back to Login
-              </Button>
-            </div>
+            <Button variant="outline" onClick={() => router.push("/login")} className="w-full">
+              Back to Login
+            </Button>
           </div>
         )}
       </CardContent>

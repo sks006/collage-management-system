@@ -162,8 +162,8 @@ export default function StaffPage() {
       </div>
 
       {/* Quick KPI stats */}
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="shadow-xs">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
+        <Card className="shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Faculty & Admin</CardTitle>
           </CardHeader>
@@ -172,7 +172,7 @@ export default function StaffPage() {
             <p className="text-[11px] text-muted-foreground">Active in database</p>
           </CardContent>
         </Card>
-        <Card className="shadow-xs">
+        <Card className="shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Pending Verification</CardTitle>
           </CardHeader>
@@ -181,7 +181,7 @@ export default function StaffPage() {
             <p className="text-[11px] text-muted-foreground">Awaiting admin review</p>
           </CardContent>
         </Card>
-        <Card className="shadow-xs">
+        <Card className="shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Payroll Link</CardTitle>
           </CardHeader>
@@ -190,7 +190,7 @@ export default function StaffPage() {
             <p className="text-[11px] text-muted-foreground">Bank account verification</p>
           </CardContent>
         </Card>
-        <Card className="shadow-xs">
+        <Card className="shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Row Scopes</CardTitle>
           </CardHeader>
@@ -203,7 +203,7 @@ export default function StaffPage() {
 
       {/* Main Content View */}
       {activeTab === "DIRECTORY" ? (
-        <Card className="shadow-xs">
+        <Card className="shadow-sm">
           <CardHeader className="p-4 border-b">
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
               <div className="relative flex-1 max-w-sm">
@@ -296,7 +296,7 @@ export default function StaffPage() {
         </Card>
       ) : (
         /* PENDING ROLE APPROVALS TAB */
-        <Card className="shadow-xs">
+        <Card className="shadow-sm">
           <CardHeader className="p-4 border-b">
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
               <div className="relative flex-1 max-w-sm">

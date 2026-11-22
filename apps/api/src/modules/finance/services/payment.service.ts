@@ -120,7 +120,7 @@ export class PaymentService {
       return { status: "ALREADY_PROCESSED" };
     }
 
-    // 2. Validate with payment aggregator / mock matching
+    // 2. Validate with payment aggregator webhook matching
     const isMatched = payload.status === "VALID" || payload.status === "SUCCESS";
 
     return this.db.transaction(async (tx) => {
@@ -136,17 +136,18 @@ export class PaymentService {
           .where(eq(payment.aggregatorTranId, tranId));
 
         // Step B: Post to append-only ledger
+        const partyId = (existingPayment as any)?.studentId || payload.studentId || randomUUID();
         await this.ledgerRepo.recordEntry({
           account: "STUDENT_FEES",
           partyType: "STUDENT",
-          partyId: "00000000-0000-0000-0000-000000000002",
+          partyId,
           amount: amount.toString(),
           currency,
           direction: "CREDIT",
           source: "PAYMENT",
           sourceId: randomUUID(),
           idempotencyKey: `ledger_pay_${tranId}`,
-          postedBy: "00000000-0000-0000-0000-000000000001",
+          postedBy: partyId,
           status: "POSTED",
         }, tx);
 

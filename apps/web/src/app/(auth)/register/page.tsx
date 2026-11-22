@@ -52,7 +52,6 @@ export default function RegisterPage() {
 
   // OTP state
   const [otp, setOtp] = React.useState("");
-  const [demoOtp, setDemoOtp] = React.useState<string | null>(null);
   const [timeLeft, setTimeLeft] = React.useState(600); // 10 minutes
   const [isLoading, setIsLoading] = React.useState(false);
 
@@ -75,7 +74,7 @@ export default function RegisterPage() {
     e.preventDefault();
     setIsLoading(true);
     try {
-      const res = await registerUser({
+      await registerUser({
         email,
         password,
         fullName,
@@ -84,10 +83,6 @@ export default function RegisterPage() {
         phone,
       });
 
-      if (res.demoOtp) {
-        setDemoOtp(res.demoOtp);
-        setOtp(res.demoOtp); // pre-populate for quick testing convenience
-      }
       setTimeLeft(600);
       setStep("OTP");
       toast({
@@ -109,11 +104,7 @@ export default function RegisterPage() {
   const handleResendOtp = async () => {
     setIsLoading(true);
     try {
-      const res = await resendOtp(email);
-      if (res.demoOtp) {
-        setDemoOtp(res.demoOtp);
-        setOtp(res.demoOtp);
-      }
+      await resendOtp(email);
       setTimeLeft(600);
       toast({
         title: "Code Resent",
@@ -452,18 +443,6 @@ export default function RegisterPage() {
             </CardHeader>
             <CardContent>
               <form onSubmit={handleVerifyOtp} className="space-y-4">
-                {demoOtp && (
-                  <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-2.5 text-xs text-emerald-800 flex items-center justify-between">
-                    <span>
-                      Demo Mode Verification OTP:{" "}
-                      <strong className="font-mono text-sm tracking-widest">{demoOtp}</strong>
-                    </span>
-                    <Badge variant="outline" className="bg-emerald-100 text-emerald-800 border-none">
-                      Dev Active
-                    </Badge>
-                  </div>
-                )}
-
                 <div className="space-y-2 text-center">
                   <Input
                     type="text"

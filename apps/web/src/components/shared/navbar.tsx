@@ -1,16 +1,15 @@
 "use client";
 
 import * as React from "react";
-import { useAuth, DEMO_PERSONAS } from "@/lib/auth-context";
+import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/components/ui/toast";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { Bell, LogOut, User, ShieldCheck, ChevronDown, Check } from "lucide-react";
+import { Bell, LogOut, User, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 export function Navbar() {
-  const { user, logout, switchPersona } = useAuth();
+  const { user, logout } = useAuth();
   const { toast } = useToast();
-  const [showPersonaMenu, setShowPersonaMenu] = React.useState(false);
   const [showNotifications, setShowNotifications] = React.useState(false);
 
   const notifications = [
@@ -18,16 +17,6 @@ export function Navbar() {
     { id: "2", title: "New Fee Payment Verified", desc: "৳ 3,500 credited via bKash IPN webhook.", time: "25m ago" },
     { id: "3", title: "Half-Yearly Routine Published", desc: "Exam schedule live for Class 11 & 12.", time: "2h ago" },
   ];
-
-  const handleRoleSelect = (roleKey: string) => {
-    switchPersona(roleKey);
-    setShowPersonaMenu(false);
-    toast({
-      title: `Switched Persona: ${roleKey}`,
-      description: `Active role changed to ${roleKey}. Navigation and permissions updated.`,
-      type: "info",
-    });
-  };
 
   const handleLogout = () => {
     logout();
@@ -39,7 +28,7 @@ export function Navbar() {
   };
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b bg-card px-4 sm:px-6 shadow-sm">
+    <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b bg-card px-4 sm:px-6 shadow-sm shrink-0">
       {/* Left: Composable Sidebar Trigger & Institutional Indicator */}
       <div className="flex items-center gap-2 sm:gap-3 min-w-0">
         <SidebarTrigger className="-ml-1" />
@@ -61,44 +50,10 @@ export function Navbar() {
 
       {/* Right: Actions & User Menu */}
       <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-        {/* Dynamic Persona Switcher Dropdown */}
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => setShowPersonaMenu(!showPersonaMenu)}
-            className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-full border border-border bg-muted/60 hover:bg-muted transition-colors whitespace-nowrap"
-          >
-            <ShieldCheck className="h-3.5 w-3.5 text-primary shrink-0" />
-            <span>Role: <strong className="text-foreground">{user?.roles[0] || "USER"}</strong></span>
-            <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
-          </button>
-
-          {showPersonaMenu && (
-            <div className="absolute right-0 mt-2 w-64 rounded-xl border bg-card p-2 shadow-xl z-50 text-card-foreground text-xs animate-in fade-in zoom-in-95 duration-150">
-              <div className="px-2 py-1.5 font-bold text-muted-foreground uppercase text-[10px] tracking-wider border-b mb-1">
-                Switch Active Persona
-              </div>
-              {Object.entries(DEMO_PERSONAS).map(([key, p]) => {
-                const isActive = user?.email === p.email;
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => handleRoleSelect(key)}
-                    className={`w-full flex items-center justify-between px-2.5 py-2 rounded-md hover:bg-muted text-left transition-colors ${
-                      isActive ? "bg-primary/10 text-primary font-semibold" : ""
-                    }`}
-                  >
-                    <div>
-                      <div className="text-xs font-medium">{p.name}</div>
-                      <div className="text-[10px] text-muted-foreground">{key} · {p.email}</div>
-                    </div>
-                    {isActive && <Check className="h-3.5 w-3.5 text-primary shrink-0" />}
-                  </button>
-                );
-              })}
-            </div>
-          )}
+        {/* User Role Indicator */}
+        <div className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-full border border-border bg-muted/60 text-muted-foreground whitespace-nowrap">
+          <ShieldCheck className="h-3.5 w-3.5 text-primary shrink-0" />
+          <span>Role: <strong className="text-foreground">{user?.roles[0] || "USER"}</strong></span>
         </div>
 
         {/* Notifications */}
@@ -138,7 +93,7 @@ export function Navbar() {
             {user?.name ? user.name.slice(0, 2).toUpperCase() : <User className="h-4 w-4" />}
           </div>
           <div className="hidden md:block text-left text-xs min-w-0 max-w-[130px]">
-            <div className="font-semibold text-foreground truncate">{user?.name || "Dr. Rafiqul Islam"}</div>
+            <div className="font-semibold text-foreground truncate">{user?.name || "Authenticated User"}</div>
             <div className="text-[11px] text-muted-foreground truncate">{user?.email}</div>
           </div>
           <button

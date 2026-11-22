@@ -23,7 +23,7 @@ export const authService = {
     }),
 
   register: (payload: RegisterRequest) =>
-    apiClient<{ success: boolean; email: string; message: string; demoOtp?: string }>(
+    apiClient<{ success: boolean; email: string; message: string }>(
       "/auth/register",
       {
         method: "POST",

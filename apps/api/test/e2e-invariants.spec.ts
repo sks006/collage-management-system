@@ -17,7 +17,7 @@ describe("E2E Institutional Safety Invariants", () => {
     it("should allow inserting new ledger entries, but forbid UPDATE and DELETE", async () => {
       const entryId = randomUUID();
       const idempotencyKey = `test_inv_${Date.now()}`;
-      const partyId = "00000000-0000-0000-0000-000000000001";
+      const partyId = randomUUID();
 
       // 1. INSERT must succeed
       await db.insert(ledgerEntry).values({
@@ -56,7 +56,7 @@ describe("E2E Institutional Safety Invariants", () => {
 
   describe("Invariant 2: Maker-Checker Approval Gate", () => {
     it("should reject period close approval when submitter is the approver", async () => {
-      const creatorId = "00000000-0000-0000-0000-000000000001";
+      const creatorId = randomUUID();
       const approverId = creatorId; // Attempt self-approval
 
       // Verify the business invariant: creator !== approver

@@ -6,7 +6,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { useAuth, DEMO_PERSONAS } from "@/lib/auth-context";
+import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/components/ui/toast";
 import {
   GraduationCap,
@@ -23,10 +23,10 @@ import {
 } from "lucide-react";
 
 export default function LoginPage() {
-  const { login, loginWithKeycloak, switchPersona } = useAuth();
+  const { login, loginWithKeycloak } = useAuth();
   const { toast } = useToast();
   const [email, setEmail] = React.useState("principal@dhakamodel.edu.bd");
-  const [password, setPassword] = React.useState("password123");
+  const [password, setPassword] = React.useState("College@2026");
   const [isLoading, setIsLoading] = React.useState(false);
 
   const handleCredentialsLogin = async (e: React.FormEvent) => {
@@ -44,22 +44,6 @@ export default function LoginPage() {
         title: "Login Failed",
         description: err.message || "Invalid credentials. Please verify your email and password.",
         type: "error",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleQuickPersona = async (roleKey: string) => {
-    const persona = DEMO_PERSONAS[roleKey]!;
-    setIsLoading(true);
-    try {
-      switchPersona(roleKey);
-      await login(persona.email, "demo", roleKey);
-      toast({
-        title: `Logged in as ${persona.name}`,
-        description: `Active Role: ${persona.roles.join(", ")}`,
-        type: "success",
       });
     } finally {
       setIsLoading(false);
@@ -134,78 +118,6 @@ export default function LoginPage() {
               {isLoading ? "Signing in..." : "Sign In with Credentials"}
             </Button>
           </form>
-
-          {/* Quick Demo Persona Switcher */}
-          <div className="relative py-1">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t border-border" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-card px-2 text-muted-foreground font-medium">Quick Persona Switch</span>
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <p className="text-[11px] text-muted-foreground text-center">
-              Instant login with verified role permissions:
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="justify-start text-xs h-9 hover:border-primary"
-                onClick={() => handleQuickPersona("ADMIN")}
-              >
-                <ShieldCheck className="h-3.5 w-3.5 text-primary mr-1.5 shrink-0" />
-                <span className="truncate">Principal / Admin</span>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="justify-start text-xs h-9 hover:border-primary"
-                onClick={() => handleQuickPersona("TEACHER")}
-              >
-                <BookOpen className="h-3.5 w-3.5 text-blue-500 mr-1.5 shrink-0" />
-                <span className="truncate">Teacher / Faculty</span>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="justify-start text-xs h-9 hover:border-primary"
-                onClick={() => handleQuickPersona("FINANCE")}
-              >
-                <Coins className="h-3.5 w-3.5 text-emerald-600 mr-1.5 shrink-0" />
-                <span className="truncate">Finance Officer</span>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="justify-start text-xs h-9 hover:border-primary"
-                onClick={() => handleQuickPersona("OFFICE")}
-              >
-                <Briefcase className="h-3.5 w-3.5 text-amber-500 mr-1.5 shrink-0" />
-                <span className="truncate">Admin Office</span>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="justify-start text-xs h-9 hover:border-primary"
-                onClick={() => handleQuickPersona("PARENT")}
-              >
-                <Users className="h-3.5 w-3.5 text-purple-500 mr-1.5 shrink-0" />
-                <span className="truncate">Parent / Guardian</span>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="justify-start text-xs h-9 hover:border-primary"
-                onClick={() => handleQuickPersona("STUDENT")}
-              >
-                <GraduationCap className="h-3.5 w-3.5 text-teal-500 mr-1.5 shrink-0" />
-                <span className="truncate">Student</span>
-              </Button>
-            </div>
-          </div>
         </CardContent>
         <CardFooter className="flex flex-col space-y-2 border-t pt-4 text-center">
           <p className="text-xs text-muted-foreground">

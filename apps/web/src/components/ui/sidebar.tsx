@@ -322,13 +322,13 @@ SidebarRail.displayName = "SidebarRail";
 
 const SidebarInset = React.forwardRef<
   HTMLDivElement,
-  React.ComponentProps<"main">
+  React.ComponentProps<"div">
 >(({ className, ...props }, ref) => {
   return (
-    <main
+    <div
       ref={ref}
       className={cn(
-        "relative flex min-h-svh flex-1 flex-col bg-background min-w-0 w-full overflow-x-hidden",
+        "relative flex min-h-svh h-svh max-h-svh flex-1 flex-col bg-background min-w-0 w-full overflow-hidden",
         className
       )}
       {...props}
@@ -376,7 +376,7 @@ const SidebarContent = React.forwardRef<
       ref={ref}
       data-sidebar="content"
       className={cn(
-        "flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden",
+        "flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-2 pb-6",
         className
       )}
       {...props}
@@ -489,7 +489,7 @@ const SidebarMenuButton = React.forwardRef<
         title={tooltip}
         className={cn(
           "peer/menu-button flex w-full items-center gap-2.5 overflow-hidden rounded-md p-2 text-left text-xs font-medium outline-none transition-[width,height,padding,color,background-color] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring disabled:pointer-events-none disabled:opacity-50 group-has-[[data-sidebar=menu-action]]/menu-item:pr-8 aria-disabled:pointer-events-none aria-disabled:opacity-50",
-          "data-[active=true]:bg-primary/10 data-[active=true]:text-primary data-[active=true]:font-semibold data-[active=true]:shadow-xs",
+          "data-[active=true]:bg-primary/10 data-[active=true]:text-primary data-[active=true]:font-semibold data-[active=true]:shadow-sm",
           size === "default" && "h-9 text-xs",
           size === "sm" && "h-7 text-xs",
           size === "lg" && "h-11 text-sm",

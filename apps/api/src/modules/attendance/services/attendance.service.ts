@@ -68,8 +68,8 @@ export class AttendanceService {
       sectionId: body.sectionId,
       status: "PRESENT",
       source: "DEVICE",
-      markedBy: body.deviceId || "00000000-0000-0000-0000-000000000001",
-      deviceId: body.deviceId || "00000000-0000-0000-0000-000000000001",
+      markedBy: body.deviceId || "BIO-GATE-01",
+      deviceId: body.deviceId || "BIO-GATE-01",
     };
 
     const saved = await this.repo.saveBatch([event]);

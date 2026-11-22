@@ -12,51 +12,6 @@ export interface UserSession {
   phone?: string;
 }
 
-export const DEMO_PERSONAS: Record<string, UserSession> = {
-  ADMIN: {
-    id: "00000000-0000-0000-0000-000000000001",
-    name: "Dr. Rafiqul Islam",
-    email: "principal@dhakamodel.edu.bd",
-    roles: ["ADMIN", "PRINCIPAL", "TEACHER", "FINANCE"],
-    phone: "+8801711000001",
-  },
-  TEACHER: {
-    id: "00000000-0000-0000-0000-000000000002",
-    name: "Rahim Ahmed",
-    email: "rahim.physics@dhakamodel.edu.bd",
-    roles: ["TEACHER"],
-    phone: "+8801711000002",
-  },
-  FINANCE: {
-    id: "00000000-0000-0000-0000-000000000003",
-    name: "Kamal Hossain",
-    email: "finance@dhakamodel.edu.bd",
-    roles: ["FINANCE"],
-    phone: "+8801711000003",
-  },
-  OFFICE: {
-    id: "00000000-0000-0000-0000-000000000004",
-    name: "Farhana Yasmin",
-    email: "admissions@dhakamodel.edu.bd",
-    roles: ["OFFICE"],
-    phone: "+8801711000004",
-  },
-  PARENT: {
-    id: "00000000-0000-0000-0000-000000000005",
-    name: "Abul Kalam (Guardian)",
-    email: "parent.kalam@gmail.com",
-    roles: ["PARENT"],
-    phone: "+8801711000005",
-  },
-  STUDENT: {
-    id: "00000000-0000-0000-0000-000000000006",
-    name: "Tanvir Hasan (DMC-2026-001)",
-    email: "tanvir.student@dhakamodel.edu.bd",
-    roles: ["STUDENT"],
-    phone: "+8801711000006",
-  },
-};
-
 interface AuthContextValue {
   user: UserSession | null;
   token: string | null;
@@ -72,12 +27,11 @@ interface AuthContextValue {
     requestedRole: string;
     referenceNo?: string;
     phone?: string;
-  }) => Promise<{ success: boolean; demoOtp?: string; message: string; email: string }>;
+  }) => Promise<{ success: boolean; message: string; email: string }>;
   verifyUserOtp: (data: { email: string; otp: string }) => Promise<any>;
   resendOtp: (email: string) => Promise<any>;
   logout: () => void;
-  switchPersona: (roleKey: string) => void;
-  setSession: (user: UserSession, token?: string) => void;
+  setSession: (user: UserSession | null, token?: string | null) => void;
 }
 
 const AuthContext = React.createContext<AuthContextValue | null>(null);
@@ -188,13 +142,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (json.accessToken) {
-        const fallbackUser: UserSession = {
-          id: `usr-${Buffer.from(email).toString("base64").substring(0, 8)}`,
+        const authedUser: UserSession = {
+          id: json.user?.id || `usr-${Buffer.from(email).toString("base64").substring(0, 8)}`,
           email,
-          name: email.split("@")[0],
-          roles: [role],
+          name: json.user?.name || email.split("@")[0],
+          roles: json.user?.roles || [role],
         };
-        setSession(fallbackUser, json.accessToken);
+        setSession(authedUser, json.accessToken);
         router.push("/");
       }
     },
@@ -256,16 +210,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.push("/login");
   }, [router]);
 
-  const switchPersona = React.useCallback(
-    (roleKey: string) => {
-      const persona = DEMO_PERSONAS[roleKey];
-      if (persona) {
-        setSession(persona, `jwt-demo-${roleKey.toLowerCase()}`);
-      }
-    },
-    [setSession],
-  );
-
   return (
     <AuthContext.Provider
       value={{
@@ -280,7 +224,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         verifyUserOtp,
         resendOtp,
         logout,
-        switchPersona,
         setSession,
       }}
     >

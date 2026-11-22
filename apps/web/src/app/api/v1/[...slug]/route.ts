@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const BACKEND_URL = process.env.API_URL || "http://localhost:4000";
+const BACKEND_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:4000";
 
 async function proxyToBackend(request: NextRequest, slug: string[]) {
   const path = slug.join("/");

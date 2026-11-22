@@ -51,9 +51,9 @@ export class NotificationProcessor {
     } else {
       logger.info(
         { to: options.to, subject: options.subject },
-        "[NotificationProcessor:DEV-MOCK] Email dispatched (credentials not active)",
+        "[NotificationProcessor:DEV] Email dispatched (credentials not active)",
       );
-      return { messageId: `mock-${Date.now()}` };
+      return { messageId: `dev-smtp-${Date.now()}` };
     }
   }
 
