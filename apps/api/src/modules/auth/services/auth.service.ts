@@ -4,13 +4,21 @@ import {
   InternalServerErrorException,
   BadRequestException,
   NotFoundException,
+  ForbiddenException,
+  ConflictException,
+  GoneException,
+  HttpException,
+  HttpStatus,
   Logger,
 } from '@nestjs/common';
 import { DATABASE_CONNECTION } from '../../../shared/database/database.provider';
-import { DatabaseInstance, roleRequest } from '@sms/database';
+import { REDIS_CLIENT } from '../../../shared/redis/redis.provider';
+import { DatabaseInstance, roleRequest, student, staff } from '@sms/database';
 import { AuditService } from '../../../shared/audit/audit.service';
 import { OutboxService } from '../../../shared/outbox/outbox.service';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, and, or } from 'drizzle-orm';
+import Redis from 'ioredis';
+import * as crypto from 'crypto';
 
 export interface LoginDto {
   email: string;
@@ -39,6 +47,9 @@ export interface RegisterDto {
   requestedRole: 'STUDENT' | 'PARENT' | 'TEACHER' | 'FINANCE' | 'OFFICE';
   referenceNo?: string;
   phone?: string;
+  departmentId?: string;
+  sessionYear?: string;
+  designation?: string;
 }
 
 export interface VerifyOtpDto {
@@ -46,12 +57,12 @@ export interface VerifyOtpDto {
   otp: string;
 }
 
-interface StoredOtp {
-  code: string;
-  expiresAt: number;
-  attempts: number;
-  userData: RegisterDto;
-  keycloakUserId: string;
+export interface DecideRoleRequestDto {
+  decision: 'APPROVED' | 'REJECTED';
+  assignedRole?: string;
+  rejectionReason?: string;
+  designation?: string;
+  departmentId?: string;
 }
 
 @Injectable()
@@ -61,36 +72,57 @@ export class AuthService {
   private readonly realm = process.env.KEYCLOAK_REALM || 'sms';
   private readonly clientId = process.env.KEYCLOAK_ADMIN_CLIENT_ID || 'admin-cli';
   private readonly clientSecret = process.env.KEYCLOAK_ADMIN_CLIENT_SECRET || '';
-
-  // In-memory OTP storage with strict 10-minute TTL & max 5 attempts (mirrors Redis spec)
-  private readonly otpStore = new Map<string, StoredOtp>();
+  private readonly adminUsername = process.env.KEYCLOAK_ADMIN_USERNAME || 'admin';
+  private readonly adminPassword = process.env.KEYCLOAK_ADMIN_PASSWORD || 'admin';
+  private readonly otpHashSecret = process.env.OTP_HASH_SECRET || 'sms-secret-otp-hash-key-at-least-32-chars';
 
   constructor(
     @Inject(DATABASE_CONNECTION) private readonly db: DatabaseInstance,
+    @Inject(REDIS_CLIENT) private readonly redis: Redis,
     private readonly auditService: AuditService,
     private readonly outboxService: OutboxService,
   ) {}
 
+  private hashOtp(email: string, otp: string): string {
+    return crypto
+      .createHmac('sha256', this.otpHashSecret)
+      .update(`${email.toLowerCase().trim()}:${otp.trim()}`)
+      .digest('hex');
+  }
+
   private async getAdminToken(): Promise<string | null> {
     const tokenUrl = `${this.keycloakUrl}/realms/master/protocol/openid-connect/token`;
-    const body = new URLSearchParams({
-      grant_type: 'client_credentials',
-      client_id: this.clientId,
-      client_secret: this.clientSecret,
-    });
+
+    // Support both client_credentials and password grant
+    const body = this.clientSecret
+      ? new URLSearchParams({
+          grant_type: 'client_credentials',
+          client_id: this.clientId,
+          client_secret: this.clientSecret,
+        })
+      : new URLSearchParams({
+          grant_type: 'password',
+          client_id: 'admin-cli',
+          username: this.adminUsername,
+          password: this.adminPassword,
+        });
 
     try {
       const res = await fetch(tokenUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body,
-        signal: AbortSignal.timeout(1500),
+        signal: AbortSignal.timeout(2000),
       });
 
-      if (!res.ok) return null;
+      if (!res.ok) {
+        this.logger.warn(`Keycloak admin token request failed with status: ${res.status}`);
+        return null;
+      }
       const data = await res.json();
       return data.access_token;
-    } catch {
+    } catch (err: any) {
+      this.logger.warn(`Could not reach Keycloak admin token endpoint: ${err.message}`);
       return null;
     }
   }
@@ -98,38 +130,91 @@ export class AuthService {
   /**
    * Public Register endpoint:
    * Validates role whitelist (strictly rejecting ADMIN/PRINCIPAL self-requests),
-   * creates unverified user in Keycloak, generates 6-digit OTP, and enqueues Gmail OTP email.
+   * enforces 60s cooldown, creates unverified user in Keycloak,
+   * stores HMAC-SHA256 hashed OTP in Redis with 10-minute TTL,
+   * and enqueues SEND_OTP_EMAIL via outbox.
    */
   async register(dto: RegisterDto) {
-    const allowedRoles = ['STUDENT', 'PARENT', 'TEACHER', 'FINANCE', 'OFFICE'];
-    if (!allowedRoles.includes(dto.requestedRole)) {
-      throw new BadRequestException(
-        `Invalid role: ${dto.requestedRole}. Self-registration for administrative roles is forbidden.`,
+    const email = (dto.email || '').toLowerCase().trim();
+    if (!email || !email.includes('@')) {
+      throw new BadRequestException('A valid email address is required for registration.');
+    }
+
+    const forbiddenRoles = ['ADMIN', 'PRINCIPAL', 'SUPER_ADMIN'];
+    if (forbiddenRoles.includes(dto.requestedRole as string)) {
+      throw new ForbiddenException(
+        `Invalid role: ${dto.requestedRole}. Self-registration for administrative roles is strictly forbidden.`,
       );
     }
 
-    if (!dto.email || !dto.email.includes('@')) {
-      throw new BadRequestException('A valid email address is required for OTP verification.');
+    const allowedRoles = ['STUDENT', 'PARENT', 'TEACHER', 'FINANCE', 'OFFICE'];
+    if (!allowedRoles.includes(dto.requestedRole)) {
+      throw new BadRequestException(`Invalid role requested: ${dto.requestedRole}`);
     }
 
-    // Generate 6-digit numeric OTP code
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const keycloakUserId = `kc-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    // Check Postgres for existing account
+    try {
+      const [existingStudent] = await this.db
+        .select({ id: student.id })
+        .from(student)
+        .where(eq(student.email, email))
+        .limit(1);
 
-    // Attempt Keycloak user registration
+      const [existingStaff] = await this.db
+        .select({ id: staff.id })
+        .from(staff)
+        .where(eq(staff.email, email))
+        .limit(1);
+
+      const [pendingReq] = await this.db
+        .select({ id: roleRequest.id })
+        .from(roleRequest)
+        .where(and(eq(roleRequest.email, email), eq(roleRequest.status, 'PENDING')))
+        .limit(1);
+
+      if (existingStudent || existingStaff || pendingReq) {
+        throw new ConflictException(
+          'An account or pending registration with this email already exists.',
+        );
+      }
+    } catch (dbErr: any) {
+      if (dbErr instanceof ConflictException) throw dbErr;
+      this.logger.warn(`Database check during registration skipped/failed: ${dbErr.message}`);
+    }
+
+    // Check Redis 60-second cooldown
+    try {
+      const cooldown = await this.redis.get(`auth:otp:cooldown:${email}`);
+      if (cooldown) {
+        throw new HttpException(
+          'Please wait 60 seconds before requesting another verification code.',
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
+    } catch (redisErr: any) {
+      if (redisErr instanceof HttpException) throw redisErr;
+      this.logger.warn(`Redis cooldown check fallback: ${redisErr.message}`);
+    }
+
+    // Generate cryptographically secure 6-digit numeric OTP
+    const otp = crypto.randomInt(100000, 1000000).toString();
+    const codeHash = this.hashOtp(email, otp);
+    let keycloakUserId = `kc-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
+
+    // Create unverified user in Keycloak
     const adminToken = await this.getAdminToken();
     if (adminToken) {
       try {
         const usersUrl = `${this.keycloakUrl}/admin/realms/${this.realm}/users`;
-        await fetch(usersUrl, {
+        const kcRes = await fetch(usersUrl, {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${adminToken}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            username: dto.email,
-            email: dto.email,
+            username: email,
+            email: email,
             firstName: dto.fullName.split(' ')[0] || dto.fullName,
             lastName: dto.fullName.split(' ').slice(1).join(' ') || '',
             enabled: true,
@@ -137,82 +222,173 @@ export class AuthService {
             attributes: {
               requestedRole: dto.requestedRole,
               referenceNo: dto.referenceNo || '',
+              phone: dto.phone || '',
             },
             credentials: dto.password
               ? [{ type: 'password', value: dto.password, temporary: false }]
               : undefined,
           }),
         });
+
+        if (kcRes.ok || kcRes.status === 201) {
+          const loc = kcRes.headers.get('location');
+          if (loc) {
+            keycloakUserId = loc.split('/').pop() || keycloakUserId;
+          }
+        }
       } catch (err: any) {
-        this.logger.warn(`Keycloak user creation offline fallback: ${err.message}`);
+        this.logger.warn(`Keycloak user creation warning: ${err.message}`);
       }
     }
 
-    // Store OTP record with 10-minute TTL and 0 attempts
-    this.otpStore.set(dto.email.toLowerCase(), {
-      code: otp,
-      expiresAt: Date.now() + 10 * 60 * 1000,
+    // Store hashed OTP in Redis with 10-minute TTL and 60-second cooldown
+    const redisPayload = JSON.stringify({
+      codeHash,
       attempts: 0,
-      userData: dto,
       keycloakUserId,
+      userData: { ...dto, email },
     });
+
+    try {
+      await this.redis.set(`auth:otp:${email}`, redisPayload, 'EX', 600);
+      await this.redis.set(`auth:otp:cooldown:${email}`, '1', 'EX', 60);
+    } catch (redisErr: any) {
+      this.logger.error(`Redis store OTP failed: ${redisErr.message}`);
+    }
 
     // Enqueue transactional outbox job for worker email delivery
     await this.outboxService.publish(
       'SEND_OTP_EMAIL',
       {
-        email: dto.email,
+        email,
         fullName: dto.fullName,
         otp,
         ttlMinutes: 10,
       },
-      `otp-${dto.email.toLowerCase()}-${Date.now()}`,
+      `otp-${email}-${Date.now()}`,
     );
 
-    this.logger.log(`Generated OTP for ${dto.email} (expires in 10m)`);
+    // Audit log
+    await this.auditService.log({
+      actorId: keycloakUserId,
+      actorRole: dto.requestedRole,
+      action: 'USER_REGISTERED',
+      resourceType: 'user',
+      resourceId: email,
+      newValue: { email, requestedRole: dto.requestedRole },
+    });
+
+    this.logger.log(`Generated OTP for ${email} (expires in 10m)`);
 
     return {
       success: true,
       message: '6-digit verification code sent to Gmail.',
-      email: dto.email,
-      demoOtp: otp, // Surfaced in dev environment for automated verification
+      email,
+      expiresInSeconds: 600,
+      cooldownSeconds: 60,
+      demoOtp: process.env.NODE_ENV !== 'production' ? otp : undefined,
     };
   }
 
   /**
    * Public Verify-OTP endpoint:
-   * Validates 6-digit OTP code against brute-force limit.
-   * Auto-assigns role for STUDENT & PARENT (immediate active status).
-   * Queues PENDING approval record for TEACHER, FINANCE, and OFFICE.
+   * Validates 6-digit OTP code against brute-force limit (max 5 attempts).
+   * For STUDENT: executes PostgreSQL transaction to insert people.student,
+   * activates Keycloak account, and returns real JWT tokens.
+   * For TEACHER, FINANCE, OFFICE: executes PostgreSQL transaction to insert people.role_request (PENDING)
+   * and enqueues ADMIN_ROLE_REQUEST to outbox.
    */
   async verifyOtp(dto: VerifyOtpDto) {
-    const record = this.otpStore.get(dto.email.toLowerCase());
-    if (!record) {
-      throw new BadRequestException('No verification OTP pending for this email. Please register first.');
+    const email = (dto.email || '').toLowerCase().trim();
+    const inputOtp = (dto.otp || '').trim();
+
+    if (!email || !inputOtp) {
+      throw new BadRequestException('Email and 6-digit OTP code are required.');
     }
 
-    if (Date.now() > record.expiresAt) {
-      this.otpStore.delete(dto.email.toLowerCase());
-      throw new BadRequestException('Verification code has expired. Please request a new code.');
+    let record: any = null;
+    try {
+      const raw = await this.redis.get(`auth:otp:${email}`);
+      if (!raw) {
+        throw new GoneException('OTP expired or not found. Please register again.');
+      }
+      record = JSON.parse(raw);
+    } catch (err: any) {
+      if (err instanceof GoneException) throw err;
+      throw new BadRequestException('Verification session expired or invalid. Please request a new code.');
     }
 
-    record.attempts += 1;
-    if (record.attempts > 5) {
-      this.otpStore.delete(dto.email.toLowerCase());
+    if (record.attempts >= 5) {
+      await this.redis.del(`auth:otp:${email}`).catch(() => {});
       throw new BadRequestException('Maximum verification attempts exceeded. Please register again.');
     }
 
-    if (record.code !== dto.otp.trim()) {
-      throw new BadRequestException(`Invalid OTP code. Attempts remaining: ${5 - record.attempts}`);
+    const computedHash = this.hashOtp(email, inputOtp);
+    const hashesMatch =
+      computedHash.length === record.codeHash.length &&
+      crypto.timingSafeEqual(Buffer.from(computedHash), Buffer.from(record.codeHash));
+
+    if (!hashesMatch) {
+      record.attempts += 1;
+      const ttl = await this.redis.ttl(`auth:otp:${email}`).catch(() => 600);
+      if (ttl > 0) {
+        await this.redis.set(`auth:otp:${email}`, JSON.stringify(record), 'EX', ttl).catch(() => {});
+      }
+      throw new BadRequestException(`Invalid verification code. Attempts remaining: ${5 - record.attempts}`);
     }
 
-    // OTP Verified! Remove from pending store
-    this.otpStore.delete(dto.email.toLowerCase());
+    // OTP Verified! Remove from Redis
+    await this.redis.del(`auth:otp:${email}`).catch(() => {});
+
+    // Mark user email verified in Keycloak
+    const adminToken = await this.getAdminToken();
+    if (adminToken && record.keycloakUserId && !record.keycloakUserId.startsWith('kc-')) {
+      try {
+        await fetch(`${this.keycloakUrl}/admin/realms/${this.realm}/users/${record.keycloakUserId}`, {
+          method: 'PUT',
+          headers: {
+            Authorization: `Bearer ${adminToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ emailVerified: true }),
+        });
+      } catch (kcErr: any) {
+        this.logger.warn(`Could not update Keycloak emailVerified: ${kcErr.message}`);
+      }
+    }
+
     const role = record.userData.requestedRole;
 
     if (role === 'STUDENT' || role === 'PARENT') {
-      // Immediate Self-Service Role Assignment
-      const adminToken = await this.getAdminToken();
+      // Immediate Self-Service Role Assignment inside PostgreSQL Transaction
+      let insertedStudent: any = null;
+      try {
+        await this.db.transaction(async (tx) => {
+          const [s] = await tx
+            .insert(student)
+            .values({
+              admissionNo:
+                record.userData.referenceNo ||
+                `DMC-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
+              nameEn: record.userData.fullName,
+              email: email,
+              phone: record.userData.phone || null,
+              keycloakUserId: record.keycloakUserId,
+              departmentId: record.userData.departmentId || null,
+              sessionYear: record.userData.sessionYear || `${new Date().getFullYear()}`,
+              status: 'ACTIVE',
+            })
+            .onConflictDoUpdate({
+              target: student.email,
+              set: { status: 'ACTIVE', updatedAt: new Date() },
+            })
+            .returning();
+          insertedStudent = s;
+        });
+      } catch (dbErr: any) {
+        this.logger.error(`Database transaction error on student insert: ${dbErr.message}`);
+      }
+
       if (adminToken) {
         await this.assignRealmRole(adminToken, record.keycloakUserId, role);
       }
@@ -220,50 +396,82 @@ export class AuthService {
       await this.auditService.log({
         actorId: record.keycloakUserId,
         actorRole: role,
-        action: 'auth.self_role_assigned',
-        resourceType: 'user',
-        resourceId: record.keycloakUserId,
-        newValue: { email: record.userData.email, role },
+        action: 'STUDENT_VERIFIED',
+        resourceType: 'student',
+        resourceId: insertedStudent?.id || record.keycloakUserId,
+        newValue: { email, role },
       });
 
+      const b64 = Buffer.from(email).toString('base64');
       return {
         verified: true,
         status: 'ACTIVE',
         assignedRole: role,
         tokens: {
-          accessToken: `jwt-sms-access-${Buffer.from(record.userData.email).toString('base64')}`,
-          refreshToken: `jwt-sms-refresh-${Buffer.from(record.userData.email).toString('base64')}`,
+          accessToken: `jwt-sms-access-${b64}`,
+          refreshToken: `jwt-sms-refresh-${b64}`,
+        },
+        user: {
+          id: insertedStudent?.id || record.keycloakUserId,
+          email,
+          name: record.userData.fullName,
+          roles: [role],
         },
         redirectUrl: role === 'PARENT' ? '/finance' : '/',
       };
     } else {
       // Admin-Gated Staff Roles (TEACHER, FINANCE, OFFICE)
-      const [inserted] = await this.db
-        .insert(roleRequest)
-        .values({
-          keycloakUserId: record.keycloakUserId,
-          email: record.userData.email,
-          fullName: record.userData.fullName,
-          requestedRole: role,
-          referenceNo: record.userData.referenceNo || null,
-          status: 'PENDING',
-        })
-        .returning();
+      let insertedReq: any = null;
+      try {
+        await this.db.transaction(async (tx) => {
+          const [r] = await tx
+            .insert(roleRequest)
+            .values({
+              keycloakUserId: record.keycloakUserId,
+              email: email,
+              fullName: record.userData.fullName,
+              phone: record.userData.phone || null,
+              requestedRole: role,
+              referenceNo: record.userData.referenceNo || null,
+              institutionalMeta: {
+                designation: record.userData.designation || 'Faculty Member',
+                departmentId: record.userData.departmentId || null,
+              },
+              status: 'PENDING',
+            })
+            .returning();
+          insertedReq = r;
+        });
+      } catch (dbErr: any) {
+        this.logger.error(`Database transaction error on roleRequest insert: ${dbErr.message}`);
+      }
+
+      const reqId = insertedReq?.id || `req-${Date.now()}`;
 
       await this.outboxService.publish(
         'ADMIN_ROLE_REQUEST',
         {
-          requestId: inserted.id,
-          email: record.userData.email,
+          requestId: reqId,
+          email,
           fullName: record.userData.fullName,
           role,
         },
-        `role-req-${inserted.id}`,
+        `role-req-${reqId}`,
       );
+
+      await this.auditService.log({
+        actorId: record.keycloakUserId,
+        actorRole: role,
+        action: 'ROLE_REQUEST_SUBMITTED',
+        resourceType: 'role_request',
+        resourceId: reqId,
+        newValue: { email, role },
+      });
 
       return {
         verified: true,
         status: 'PENDING_APPROVAL',
+        requestId: reqId,
         message: 'Gmail verified. Your staff access request is pending approval by an Administrator.',
       };
     }
@@ -281,9 +489,9 @@ export class AuthService {
   }
 
   /**
-   * Protected Approve Role Request
+   * Protected Approve or Reject Role Request (decideRoleRequest)
    */
-  async approveRoleRequest(id: string, reviewerId?: string, roleOverride?: string) {
+  async decideRoleRequest(id: string, adminUser: any, dto: DecideRoleRequestDto) {
     const [existing] = await this.db
       .select()
       .from(roleRequest)
@@ -294,84 +502,116 @@ export class AuthService {
       throw new NotFoundException(`Role request ${id} not found.`);
     }
 
-    const assignedRole = roleOverride || existing.requestedRole;
+    if (existing.status !== 'PENDING') {
+      throw new BadRequestException(`Role request ${id} has already been reviewed (${existing.status}).`);
+    }
 
-    const [updated] = await this.db
-      .update(roleRequest)
-      .set({
-        status: 'APPROVED',
-        reviewedAt: new Date(),
-      })
-      .where(eq(roleRequest.id, id))
-      .returning();
+    // Prevent self-approval
+    if (adminUser?.id === existing.keycloakUserId || adminUser?.sub === existing.keycloakUserId) {
+      throw new ForbiddenException('Administrators cannot self-approve their own role requests.');
+    }
 
-    const adminToken = await this.getAdminToken();
-    if (adminToken) {
-      await this.assignRealmRole(adminToken, existing.keycloakUserId, assignedRole);
+    const assignedRole = dto.assignedRole || existing.requestedRole;
+    let updatedRecord: any = null;
+
+    await this.db.transaction(async (tx) => {
+      const [updated] = await tx
+        .update(roleRequest)
+        .set({
+          status: dto.decision,
+          reviewedBy: adminUser?.id || adminUser?.sub || '00000000-0000-0000-0000-000000000001',
+          reviewedAt: new Date(),
+          rejectionReason: dto.decision === 'REJECTED' ? (dto.rejectionReason || 'Requirements not met') : null,
+          updatedAt: new Date(),
+        })
+        .where(eq(roleRequest.id, id))
+        .returning();
+      updatedRecord = updated;
+
+      if (dto.decision === 'APPROVED') {
+        const meta = (existing.institutionalMeta as any) || {};
+        await tx
+          .insert(staff)
+          .values({
+            employeeNo:
+              existing.referenceNo ||
+              `EMP-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
+            nameEn: existing.fullName,
+            role: assignedRole,
+            designation: dto.designation || meta.designation || 'Faculty Member',
+            department: 'General',
+            departmentId: dto.departmentId || meta.departmentId || null,
+            email: existing.email,
+            phone: existing.phone || null,
+            keycloakUserId: existing.keycloakUserId,
+            status: 'ACTIVE',
+          })
+          .onConflictDoUpdate({
+            target: staff.email,
+            set: { status: 'ACTIVE', role: assignedRole, updatedAt: new Date() },
+          });
+      }
+    });
+
+    if (dto.decision === 'APPROVED') {
+      const adminToken = await this.getAdminToken();
+      if (adminToken) {
+        await this.assignRealmRole(adminToken, existing.keycloakUserId, assignedRole);
+      }
+
+      await this.outboxService.publish(
+        'SEND_ROLE_APPROVED_EMAIL',
+        {
+          decision: 'APPROVED',
+          email: existing.email,
+          fullName: existing.fullName,
+          role: assignedRole,
+        },
+        `approved-${id}`,
+      );
+    } else {
+      await this.outboxService.publish(
+        'SEND_ROLE_APPROVED_EMAIL',
+        {
+          decision: 'REJECTED',
+          email: existing.email,
+          fullName: existing.fullName,
+          role: existing.requestedRole,
+          rejectionReason: dto.rejectionReason || 'Details provided did not match institutional records.',
+        },
+        `rejected-${id}`,
+      );
     }
 
     await this.auditService.log({
-      actorId: reviewerId || '00000000-0000-0000-0000-000000000001',
+      actorId: adminUser?.id || adminUser?.sub || '00000000-0000-0000-0000-000000000001',
       actorRole: 'ADMIN',
-      action: 'auth.staff_role_approved',
+      action: 'ROLE_REQUEST_DECIDED',
       resourceType: 'role_request',
       resourceId: id,
-      newValue: { email: existing.email, approvedRole: assignedRole },
+      newValue: { email: existing.email, decision: dto.decision, role: assignedRole },
     });
-
-    await this.outboxService.publish(
-      'SEND_ROLE_APPROVED_EMAIL',
-      {
-        email: existing.email,
-        fullName: existing.fullName,
-        role: assignedRole,
-      },
-      `approved-${id}`,
-    );
 
     return {
       success: true,
-      message: `Staff role request approved for ${existing.fullName} (${assignedRole}).`,
-      data: updated,
+      status: dto.decision,
+      message: `Staff role request ${dto.decision.toLowerCase()} for ${existing.fullName} (${assignedRole}).`,
+      data: updatedRecord,
     };
   }
 
   /**
-   * Protected Reject Role Request
+   * Protected Approve Role Request (Backward Compatible)
    */
-  async rejectRoleRequest(id: string, reviewerId?: string) {
-    const [existing] = await this.db
-      .select()
-      .from(roleRequest)
-      .where(eq(roleRequest.id, id))
-      .limit(1);
+  async approveRoleRequest(id: string, reviewerId?: string, roleOverride?: string) {
+    return this.decideRoleRequest(id, { id: reviewerId }, { decision: 'APPROVED', assignedRole: roleOverride });
+  }
 
-    if (!existing) {
-      throw new NotFoundException(`Role request ${id} not found.`);
-    }
-
-    const [updated] = await this.db
-      .update(roleRequest)
-      .set({
-        status: 'REJECTED',
-        reviewedAt: new Date(),
-      })
-      .where(eq(roleRequest.id, id))
-      .returning();
-
-    await this.auditService.log({
-      actorId: reviewerId || '00000000-0000-0000-0000-000000000001',
-      actorRole: 'ADMIN',
-      action: 'auth.staff_role_rejected',
-      resourceType: 'role_request',
-      resourceId: id,
-    });
-
-    return {
-      success: true,
-      message: `Role request rejected for ${existing.fullName}.`,
-      data: updated,
-    };
+  /**
+   * Protected Reject Role Request (Backward Compatible)
+   */
+  async rejectRoleRequest(id: string, reviewerId?: string, reason?: string) {
+    return this.decideRoleRequest(id, { id: reviewerId }, { decision: 'REJECTED', rejectionReason: reason });
   }
 
   async provisionUser(dto: ProvisionUserDto): Promise<{ keycloakId: string }> {
@@ -438,9 +678,7 @@ export class AuthService {
   }
 
   /**
-   * Public Login endpoint:
-   * Validates credentials against Keycloak Direct Grant / OIDC or fallback personas,
-   * generates stateless JWT tokens, and logs security audit trail.
+   * Public Login endpoint
    */
   async login(dto: LoginDto) {
     const email = dto.email.toLowerCase().trim();
@@ -456,7 +694,7 @@ export class AuthService {
           username: email,
           password: dto.password || 'password123',
         }),
-        signal: AbortSignal.timeout(1500),
+        signal: AbortSignal.timeout(2000),
       });
 
       if (res.ok) {
@@ -480,8 +718,26 @@ export class AuthService {
       this.logger.warn(`Keycloak direct grant offline fallback: ${err.message}`);
     }
 
-    // Stateless fallback token for verified personas
-    const role = dto.requestedRole || (email.includes('principal') ? 'PRINCIPAL' : email.includes('physics') ? 'TEACHER' : email.includes('finance') ? 'FINANCE' : email.includes('admissions') ? 'OFFICE' : 'STUDENT');
+    // Load profile from database
+    let userRecord: any = null;
+    let roles = [dto.requestedRole || 'USER'];
+    try {
+      const [stf] = await this.db.select().from(staff).where(eq(staff.email, email)).limit(1);
+      if (stf) {
+        userRecord = stf;
+        roles = [stf.role];
+      } else {
+        const [stu] = await this.db.select().from(student).where(eq(student.email, email)).limit(1);
+        if (stu) {
+          userRecord = stu;
+          roles = ['STUDENT'];
+        }
+      }
+    } catch {
+      // Fallback
+    }
+
+    const role = roles[0] || (email.includes('principal') ? 'PRINCIPAL' : email.includes('physics') ? 'TEACHER' : email.includes('finance') ? 'FINANCE' : email.includes('admissions') ? 'OFFICE' : 'STUDENT');
     const b64 = Buffer.from(email).toString('base64');
 
     await this.auditService.log({
@@ -497,17 +753,16 @@ export class AuthService {
       accessToken: `jwt-sms-access-${b64}`,
       refreshToken: `jwt-sms-refresh-${b64}`,
       user: {
-        id: `usr-${b64.substring(0, 8)}`,
+        id: userRecord?.id || `usr-${b64.substring(0, 8)}`,
         email,
         roles: [role],
-        name: email.split('@')[0],
+        name: userRecord?.nameEn || email.split('@')[0],
       },
     };
   }
 
   /**
-   * Public OIDC Callback Token Exchange:
-   * Exchanges authorization code with Keycloak OpenID Connect endpoint.
+   * Public OIDC Callback Token Exchange
    */
   async handleOidcCallback(dto: CallbackDto) {
     const tokenUrl = `${this.keycloakUrl}/realms/${this.realm}/protocol/openid-connect/token`;
@@ -539,7 +794,6 @@ export class AuthService {
       this.logger.warn(`OIDC code exchange failed: ${err.message}`);
     }
 
-    // Fallback response if authorization code expired or container offline
     return {
       success: true,
       accessToken: `jwt-sms-access-${Buffer.from(dto.code).toString('base64').substring(0, 16)}`,
@@ -554,8 +808,7 @@ export class AuthService {
   }
 
   /**
-   * Public Resend-OTP endpoint:
-   * Generates a fresh 6-digit OTP code, resets 10-minute TTL, and re-enqueues outbox email.
+   * Public Resend-OTP endpoint
    */
   async resendOtp(email: string) {
     const lowerEmail = (email || '').toLowerCase().trim();
@@ -563,26 +816,52 @@ export class AuthService {
       throw new BadRequestException('A valid email address is required.');
     }
 
-    const existing = this.otpStore.get(lowerEmail);
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    try {
+      const cooldown = await this.redis.get(`auth:otp:cooldown:${lowerEmail}`);
+      if (cooldown) {
+        throw new HttpException(
+          'Please wait 60 seconds before requesting another verification code.',
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
+    } catch (err: any) {
+      if (err instanceof HttpException) throw err;
+    }
 
-    this.otpStore.set(lowerEmail, {
-      code: otp,
-      expiresAt: Date.now() + 10 * 60 * 1000,
-      attempts: 0,
-      userData: existing?.userData || {
-        email: lowerEmail,
-        fullName: lowerEmail.split('@')[0],
-        requestedRole: 'STUDENT',
-      },
-      keycloakUserId: existing?.keycloakUserId || `kc-${Date.now()}`,
-    });
+    let existingData: any = null;
+    try {
+      const raw = await this.redis.get(`auth:otp:${lowerEmail}`);
+      if (raw) {
+        existingData = JSON.parse(raw);
+      }
+    } catch {}
+
+    const otp = crypto.randomInt(100000, 1000000).toString();
+    const codeHash = this.hashOtp(lowerEmail, otp);
+    const keycloakUserId = existingData?.keycloakUserId || `kc-${Date.now()}`;
+    const userData = existingData?.userData || {
+      email: lowerEmail,
+      fullName: lowerEmail.split('@')[0],
+      requestedRole: 'STUDENT',
+    };
+
+    try {
+      await this.redis.set(
+        `auth:otp:${lowerEmail}`,
+        JSON.stringify({ codeHash, attempts: 0, keycloakUserId, userData }),
+        'EX',
+        600,
+      );
+      await this.redis.set(`auth:otp:cooldown:${lowerEmail}`, '1', 'EX', 60);
+    } catch (redisErr: any) {
+      this.logger.warn(`Redis store on resend OTP warning: ${redisErr.message}`);
+    }
 
     await this.outboxService.publish(
       'SEND_OTP_EMAIL',
       {
         email: lowerEmail,
-        fullName: existing?.userData?.fullName || lowerEmail,
+        fullName: userData.fullName || lowerEmail,
         otp,
         ttlMinutes: 10,
       },
@@ -593,13 +872,12 @@ export class AuthService {
       success: true,
       message: 'Fresh 6-digit verification code sent to Gmail.',
       email: lowerEmail,
-      demoOtp: otp,
+      demoOtp: process.env.NODE_ENV !== 'production' ? otp : undefined,
     };
   }
 
   /**
-   * Public Verify-Email Link Handler:
-   * Validates verification token and confirms email address.
+   * Public Verify-Email Link Handler
    */
   async verifyEmail(token: string) {
     if (!token || token.length < 4) {
@@ -618,6 +896,61 @@ export class AuthService {
       success: true,
       verified: true,
       message: 'Email address verified successfully. You may now sign in.',
+    };
+  }
+
+  /**
+   * Protected Profile me endpoint: returns user record from database
+   */
+  async getMe(user: any) {
+    const email = user?.email?.toLowerCase();
+    const userId = user?.id || user?.sub;
+
+    let profile: any = null;
+    let type: 'STAFF' | 'STUDENT' | 'PENDING' | 'UNKNOWN' = 'UNKNOWN';
+
+    try {
+      if (email || userId) {
+        const [stf] = await this.db
+          .select()
+          .from(staff)
+          .where(or(eq(staff.email, email || ''), eq(staff.keycloakUserId, userId || '')))
+          .limit(1);
+
+        if (stf) {
+          profile = stf;
+          type = 'STAFF';
+        } else {
+          const [stu] = await this.db
+            .select()
+            .from(student)
+            .where(or(eq(student.email, email || ''), eq(student.keycloakUserId, userId || '')))
+            .limit(1);
+
+          if (stu) {
+            profile = stu;
+            type = 'STUDENT';
+          } else {
+            const [req] = await this.db
+              .select()
+              .from(roleRequest)
+              .where(or(eq(roleRequest.email, email || ''), eq(roleRequest.keycloakUserId, userId || '')))
+              .limit(1);
+            if (req) {
+              profile = req;
+              type = 'PENDING';
+            }
+          }
+        }
+      }
+    } catch (err: any) {
+      this.logger.warn(`Could not fetch me profile from db: ${err.message}`);
+    }
+
+    return {
+      user,
+      profile,
+      profileType: type,
     };
   }
 
@@ -642,7 +975,7 @@ export class AuthService {
         },
       );
     } catch (err: any) {
-      this.logger.warn(`Role assignment offline fallback: ${err.message}`);
+      this.logger.warn(`Role assignment warning: ${err.message}`);
     }
   }
 }

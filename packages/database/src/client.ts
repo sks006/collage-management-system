@@ -23,7 +23,7 @@ export const schema = {
 };
 
 export function createDbPool(connectionString?: string) {
-  const connection = connectionString || process.env.DATABASE_URL || "postgresql://sms_api:sms_api_password@localhost:5432/sms";
+  const connection = connectionString || process.env.DATABASE_URL || "postgresql://sms_api:sms_api_password@127.0.0.1:5432/sms";
   return new Pool({
     connectionString: connection,
     max: 20,

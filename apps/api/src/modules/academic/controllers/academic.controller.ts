@@ -31,6 +31,12 @@ export class AcademicController {
     return this.service.createYear(dto, user.id, user.roles[0]);
   }
 
+  @Get("classes")
+  @ApiOperation({ summary: "List all classes" })
+  async getAllClasses() {
+    return this.service.listClasses();
+  }
+
   @Get("classes/:yearId")
   @ApiOperation({ summary: "List classes in academic year" })
   async getClasses(@Param("yearId") yearId: string) {
@@ -45,6 +51,12 @@ export class AcademicController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.service.createClass(dto, user.id, user.roles[0]);
+  }
+
+  @Get("sections")
+  @ApiOperation({ summary: "List all sections" })
+  async getAllSections() {
+    return this.service.listSections();
   }
 
   @Get("sections/:classId")

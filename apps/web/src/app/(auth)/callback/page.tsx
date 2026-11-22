@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAuth, DEMO_PERSONAS } from "@/lib/auth-context";
+import { authService } from "@/services/auth.service";
 import { ShieldCheck, Loader2, AlertCircle, ArrowRight } from "lucide-react";
 
 function KeycloakCallbackContent() {
@@ -47,20 +48,13 @@ function KeycloakCallbackContent() {
 
         // First attempt server-side BFF proxy exchange (/api/v1/auth/callback)
         try {
-          const proxyRes = await fetch("/api/v1/auth/callback", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ code, redirectUri }),
-          });
-          if (proxyRes.ok) {
-            const proxyData = await proxyRes.json();
-            if (proxyData.user && isMounted) {
-              setSession(proxyData.user, proxyData.accessToken);
-              setStatus("success");
-              setStatusMessage("Successfully authenticated via Keycloak! Redirecting to dashboard...");
-              setTimeout(() => router.push("/"), 800);
-              return;
-            }
+          const proxyData = await authService.callback({ code, redirectUri });
+          if (proxyData.user && isMounted) {
+            setSession(proxyData.user, proxyData.accessToken);
+            setStatus("success");
+            setStatusMessage("Successfully authenticated via Keycloak! Redirecting to dashboard...");
+            setTimeout(() => router.push("/"), 800);
+            return;
           }
         } catch {
           // Continue to direct Keycloak exchange

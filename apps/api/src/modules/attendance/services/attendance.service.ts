@@ -52,4 +52,27 @@ export class AttendanceService {
       requestedBy,
     });
   }
+
+  async ingestDevicePunch(body: {
+    studentId: string;
+    sectionId: string;
+    punchTime?: string;
+    deviceId?: string;
+  }) {
+    const today = (body.punchTime ? new Date(body.punchTime) : new Date()).toISOString().split("T")[0];
+
+    const event = {
+      studentId: body.studentId,
+      eventDate: today,
+      period: 0,
+      sectionId: body.sectionId,
+      status: "PRESENT",
+      source: "DEVICE",
+      markedBy: body.deviceId || "00000000-0000-0000-0000-000000000001",
+      deviceId: body.deviceId || "00000000-0000-0000-0000-000000000001",
+    };
+
+    const saved = await this.repo.saveBatch([event]);
+    return { success: true, saved, message: "Punch registered" };
+  }
 }

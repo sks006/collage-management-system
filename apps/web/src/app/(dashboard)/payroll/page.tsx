@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/toast";
 import { useAuth } from "@/lib/auth-context";
+import { formatBDT } from "@/lib/utils";
 import {
   Table,
   TableHeader,
@@ -15,146 +16,31 @@ import {
   TableHead,
   TableCell,
 } from "@/components/ui/table";
-import { apiClient } from "@/lib/api-client";
-import { formatBDT } from "@/lib/utils";
+import { usePayrollSlice, PayrollRunItem, PayrollLineItem } from "@/slicer";
 import { DollarSign, Download, CheckCircle2, ShieldCheck, Plus, RefreshCw, FileText } from "lucide-react";
-
-interface PayrollRunItem {
-  id: string;
-  month: string;
-  staffCount?: number;
-  totalStaff?: number;
-  totalGross?: number;
-  totalNet?: number;
-  totalAmount?: number;
-  status: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "DISPATCHED" | "PAID";
-  maker?: string;
-  checker?: string;
-  approvedBy?: string | null;
-  approvedAt?: string | null;
-}
-
-interface PayrollLineItem {
-  id: string;
-  runId?: string;
-  staffId?: string;
-  employeeName?: string;
-  staff?: string;
-  role?: string;
-  designation?: string;
-  baseSalary?: number;
-  gross?: number;
-  grossSalary?: number;
-  deductions?: number;
-  net?: number;
-  netSalary?: number;
-  status: string;
-}
 
 export default function PayrollPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [modalOpen, setModalOpen] = React.useState(false);
-  const [runs, setRuns] = React.useState<PayrollRunItem[]>([]);
-  const [lines, setLines] = React.useState<PayrollLineItem[]>([]);
   const [selectedMonth, setSelectedMonth] = React.useState("April 2026");
 
-  const fetchPayroll = React.useCallback(async () => {
-    try {
-      const [runsData, linesData] = await Promise.all([
-        apiClient<PayrollRunItem[]>("/payroll/runs").catch(() => []),
-        apiClient<PayrollLineItem[]>("/payroll/runs/pr-2026-03/lines").catch(() => []),
-      ]);
-
-      if (Array.isArray(runsData) && runsData.length > 0) setRuns(runsData);
-      if (Array.isArray(linesData) && linesData.length > 0) setLines(linesData);
-    } catch {
-      // Fallback
-    }
-  }, []);
-
-  React.useEffect(() => {
-    fetchPayroll();
-  }, [fetchPayroll]);
+  const { runs, lines, loading, handlers } = usePayrollSlice();
 
   const handleInitiateRun = async (e: React.FormEvent) => {
     e.preventDefault();
-    try {
-      const created = await apiClient<PayrollRunItem>("/payroll/runs", {
-        method: "POST",
-        body: JSON.stringify({ month: selectedMonth }),
-      });
-
-      setRuns((prev) => [
-        created || {
-          id: `pr-${Date.now()}`,
-          month: selectedMonth,
-          status: "DRAFT",
-          totalAmount: 512000,
-          totalStaff: lines.length,
-        },
-        ...prev,
-      ]);
+    const success = await handlers.handleComputePayroll(selectedMonth);
+    if (success) {
       setModalOpen(false);
-
-      toast({
-        title: "Payroll Run Initiated 🧮",
-        description: `Draft payroll computed from attendance lock for ${selectedMonth}. Ready for Maker-Checker authorization.`,
-        type: "success",
-      });
-    } catch (err: any) {
-      toast({
-        title: "Initiation Failed",
-        description: err.message || "Failed to start payroll run.",
-        type: "error",
-      });
     }
   };
 
-  const handleApproveRun = (runId: string) => {
-    setRuns((prev) =>
-      prev.map((r) =>
-        r.id === runId
-          ? {
-              ...r,
-              status: "DISPATCHED",
-              approvedBy: user?.name || "Dr. Rafiqul Islam (Principal)",
-              approvedAt: new Date().toISOString(),
-            }
-          : r,
-      ),
-    );
-
-    toast({
-      title: "Payroll Approved & Dispatched via BEFTN 🚀",
-      description: `Disbursement authorized by ${user?.name || "Principal"}. Ledger entry posted and bank clearing file generated.`,
-      type: "success",
-    });
+  const handleApproveRun = async (runId: string) => {
+    await handlers.handleApproveRun(runId);
   };
 
-  const handleDownloadBeftn = (run: PayrollRunItem) => {
-    const header = `101000000000000000000000DHAKA MODEL COLLEGE PAYROLL   ${run.month.replace(" ", "")}20261121\n`;
-    const body = lines
-      .map(
-        (l) =>
-          `206000000000000000000000${(l.employeeName || l.staff || "Faculty").padEnd(25, " ")}${String(l.netSalary || l.net || 50000).padStart(10, "0")}00000000000000`,
-      )
-      .join("\n");
-    const content = header + body;
-
-    const blob = new Blob([content], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `BEFTN_${run.id}_BANGLADESH_BANK.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
-
-    toast({
-      title: "BEFTN Batch File Downloaded",
-      description: `Saved BEFTN_${run.id}_BANGLADESH_BANK.txt for electronic funds transfer.`,
-      type: "success",
-    });
+  const handleDownloadBeftn = async (run: PayrollRunItem) => {
+    await handlers.handleDispatchBeftn(run.id);
   };
 
   return (

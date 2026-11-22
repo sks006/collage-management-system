@@ -52,4 +52,8 @@ export class PeriodCloseService {
 
     return approved;
   }
+
+  async list() {
+    return this.repo.findAll();
+  }
 }

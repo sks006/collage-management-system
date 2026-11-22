@@ -7,6 +7,73 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Added & Completed
+- **Frontend Single-Gateway API & Debugging Architecture (`docs/frontend_api_gateway_architecture_specification.md`):**
+  - **Tier 1: Single Client Gateway (`apps/web/src/lib/api-client.ts`):**
+    - Implemented unified `apiClient<T>()` gateway with dual SSR (cookie-aware) and CSR (localStorage) token resolution.
+    - End-to-end request tracing via `X-Request-ID` UUID generation and propagation across every call.
+    - Centralized development console debugging logger displaying collapsed request groups with status badges, endpoint paths, latency in milliseconds, query params, request bodies, and response payloads.
+    - Automatic envelope unwrapping for NestJS `ResponseInterceptor` (`{ data: ... }`).
+    - Standardized error normalization into typed `ApiError` with automatic 401 redirect protection on the client.
+  - **Tier 2: Single Server-Side BFF Proxy (`apps/web/src/app/api/v1/[...slug]/route.ts`):**
+    - Universal proxy forwarding all HTTP verbs (`GET`, `POST`, `PUT`, `PATCH`, `DELETE`) to upstream NestJS (`http://localhost:4000/api/v1/...`) with zero mock fallbacks.
+    - Transmits correlation trace IDs (`X-Request-ID`), forwards explicit Bearer authorization or promotes HttpOnly session cookies, and handles timeouts with structured 502 Bad Gateway responses.
+  - **Tier 3: Typed Domain Services (`apps/web/src/services/`):**
+    - Created dedicated domain service modules consuming `apiClient`: `authService`, `academicService`, `studentService`, `staffService`, `attendanceService`, `leaveService`, `financeService`, `payrollService`, and `noticeService` with barrel export `src/services/index.ts`.
+  - **Zero Raw Fetch Audit:**
+    - Refactored `auth-context.tsx`, `callback/page.tsx`, and Next.js Server Actions (`attendance.actions.ts`, `leave.actions.ts`, `payment.actions.ts`) to route 100% through `authService` and domain services.
+    - Audited codebase and verified 0 raw `fetch("/api/...")` occurrences outside `api-client.ts` and `route.ts`.
+  - **Frontend Slicer Layout & SOLID Slices (`apps/web/src/slicer/`):**
+    - Built vertical slice architecture (`apps/web/src/slicer/`) adhering strictly to SOLID principles, centralizing all state, business handles, and UI layout logic across dashboard features.
+  - **Verification:**
+    - `pnpm --filter @sms/web build`: Next.js 15.5.29 compiled all 17 routes with zero TypeScript or webpack errors.
+    - `pnpm build`: Completed across all workspaces (`@sms/database`, `@sms/shared`, `@sms/api`, `@sms/worker`, `@sms/web`).
+    - `pnpm test`: 100% of E2E invariant test suites passing.
+- **Full Agent Implementation Roadmap Completion (`docs/agent_implementation_roadmap.md`):**
+  - **Phase 1: Institutional Database Seeding & Complete Mock Fallback Removal:**
+    - Created idempotent institutional database seed `packages/database/src/seed.ts` registered to `pnpm db:seed` in root and package scripts.
+    - Seeded Dhaka Model College comprehensive records: Academic Year 2026 (3 terms), 6 classes, 12 sections (Padma & Meghna), 10 core subjects, 10 staff members (`EMP-2026-001` through `EMP-2026-010` across all 7 RBAC roles), 12 enrolled students with roll numbers, 2026 holiday calendar & leave balances, tuition/lab/exam fee schedules, sample invoices with balanced double-entry rows (`finance.ledger_entry`), Feb 2026 payroll run with 5 salary slips, and 4 bilingual English & Bangla notices.
+    - Completely removed all in-memory mock fallbacks (`databaseStore`) in `apps/web/src/app/api/v1/[...slug]/route.ts`. Universal proxy directly routes all `GET`, `POST`, `PUT`, `PATCH`, `DELETE` requests to NestJS (`http://127.0.0.1:4000/api/v1/...`) forwarding authorization, request IDs, and content types with exact status codes and response bodies.
+    - Added backend route controllers, services, and repositories in `apps/api` for `GET /academic/classes`, `GET /academic/sections`, `GET /attendance/close`, `GET /payroll/runs`, and `GET /leave/requests`.
+  - **Phase 2: Authentication & Dual Token Verification:**
+    - Synchronized Keycloak SSO (`infra/keycloak/realm-export.json`) on port 8080 with 7 RBAC roles and Google IdP hints.
+    - Extended `JwtAuthGuard` in `apps/api/src/shared/guards/jwt.guard.ts` to validate both Keycloak RS256 JWKS tokens and native signed tokens (`jwt-demo-*`, `jwt-sms-access-*`).
+  - **Phase 3: Production Background Processors (`apps/worker`):**
+    - Installed `pdfkit` and built production PDF generation engine in `apps/worker/src/processors/pdf-generation.processor.ts` for Fee Payment Receipts, Monthly Staff Payslips, and Student ID Cards.
+    - Built strict 128-byte fixed-width ASCII formatter in `apps/worker/src/processors/beftn-dispatch.processor.ts` per Bangladesh Bank BEFTN specifications for Record Types 1, 5, 6, 8, and 9 with `line.length === 128` assertion and paisa formatting.
+    - Implemented MFS payment webhook ingestion (`POST /finance/payments/webhook/bkash`, `/nagad`, `/sslcommerz`) and `PaymentReconcileProcessor` updating invoices to `PAID`/`PARTIAL` and appending balanced debit/credit rows to `finance.ledger_entry`.
+    - Wired outbox dispatcher for `RECONCILE_PAYMENT`, `GENERATE_PAYSLIP`, and `GENERATE_ID_CARD`.
+  - **Phase 4: S3/MinIO Storage, Biometric Ingest & E2E Invariant Test Suite:**
+    - Configured MinIO container service in `docker-compose.yml` (ports 9000 & 9001) with bucket `sms-documents`.
+    - Implemented `getPresignedUploadUrl` and `getPresignedDownloadUrl` in `apps/api/src/shared/s3/s3.service.ts` using `@aws-sdk/s3-request-presigner`.
+    - Added biometric attendance punch ingest endpoint `POST /attendance/device` secured with `DEVICE_API_KEY` header verification and deduplication window.
+    - Implemented and verified comprehensive E2E invariant test suite in `apps/api/test/e2e-invariants.spec.ts` validating append-only ledger immutability (PostgreSQL permission and trigger rejection), Maker-Checker approval segregation, idempotent payment webhook deduplication, and BEFTN 128-byte fixed line length.
+  - **Verification:**
+    - `pnpm test` passes all 5 invariant tests.
+    - `pnpm build` completes across all workspaces (`@sms/database`, `@sms/shared`, `@sms/api`, `@sms/worker`, `@sms/web`) with zero errors.
+    - Live Next.js Web (port 3000) and NestJS API (port 4000) verified returning PostgreSQL-seeded data via BFF proxy without mock fallbacks.
+- **User Sign-Up, Gmail OTP Verification & Role Approval Specification Implementation (`docs/user_sign_up_gmail_otp_verification_role_approval_specification.md`):**
+  - **Database Migration Generation (`packages/database`):**
+    - Generated 31 tables across 9 PostgreSQL schemas (`0000_rich_nighthawk.sql`) covering `people.student`, `people.staff`, `people.role_request`, `outbox.job`, and `audit.log`.
+    - Added self-registration fields to `people.student` (`departmentId`, `sessionYear`, nullable DOB/gender defaults) and `people.staff` (`role`, `departmentId`, `designation`).
+    - Added `rejectionReason`, `phone`, and `institutionalMeta` (`jsonb`) to `people.role_request`.
+  - **Worker Gmail SMTP Dispatch (`apps/worker`):**
+    - Installed `nodemailer` and `@types/nodemailer`.
+    - Configured `nodemailer` Gmail SMTP transporter in `NotificationProcessor` (`apps/worker/src/processors/notification.processor.ts`) using `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, and `SMTP_PASSWORD`.
+    - Implemented styled HTML email templates for `SEND_OTP_EMAIL` (with 6-digit numeric OTP and 10-minute expiry warning), `ADMIN_ROLE_REQUEST` (administrative alert for pending staff applications), and `SEND_ROLE_APPROVED_EMAIL` (decision notification with login link or rejection justification).
+  - **Backend API Redis & Transactional Auth Services (`apps/api`):**
+    - Wired `ioredis` (`REDIS_CLIENT`) in `AuthService` (`apps/api/src/modules/auth/services/auth.service.ts`).
+    - Replaced in-memory mock store with Redis keys: `auth:otp:${email}` (HMAC-SHA256 hashed code, 10-minute TTL, max 5 attempts tracking) and `auth:otp:cooldown:${email}` (60-second cooldown enforcement).
+    - Implemented PostgreSQL transactions (`db.transaction`) for Student self-activation and Staff `PENDING` role requests.
+    - Implemented `PATCH /api/v1/auth/role-requests/:id` in `AuthController` for Administrator 1-click approvals and rejections with rejection reason audit logging.
+  - **Zero Static Mock Auth Fallback & Dynamic State Hydration (`apps/web`):**
+    - Increased proxy timeout to 10 seconds (`AbortSignal.timeout(10000)`) in `apps/web/src/app/api/v1/[...slug]/route.ts` and removed mock `databaseStore` fallback for `/auth/*` and mutations.
+    - Removed default `DEMO_PERSONAS["ADMIN"]` initial state in `apps/web/src/lib/auth-context.tsx`, initializing `user: null` and dynamically hydrating from `GET /api/v1/auth/me`.
+    - Added **Pending Role Approvals** tab to Faculty & Staff Management page (`/staff`) enabling Admins to review, approve, and reject incoming role requests with real-time feedback.
+    - Verified complete workspace builds (`@sms/api`, `@sms/worker`, `@sms/web`) with zero errors.
+
 ## [2.6.0] - 2026-11-21
 
 ### Completed & Synced

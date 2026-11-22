@@ -16,29 +16,14 @@ import {
   TableHead,
   TableCell,
 } from "@/components/ui/table";
-import { apiClient } from "@/lib/api-client";
+import { useNoticeSlice, NoticeItem } from "@/slicer";
 import { Bell, Plus, Send, CheckCircle2, Megaphone, Globe } from "lucide-react";
-
-interface NoticeItem {
-  id: string;
-  titleEn: string;
-  titleBn?: string;
-  bodyEn?: string;
-  bodyBn?: string;
-  body?: string;
-  publishedAt?: string;
-  date?: string;
-  targetRoles?: string[];
-  audience?: string;
-  priority: "HIGH" | "NORMAL" | "MEDIUM" | "URGENT";
-  status?: "PUBLISHED" | "DRAFT";
-}
 
 export default function NoticesPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [modalOpen, setModalOpen] = React.useState(false);
-  const [notices, setNotices] = React.useState<NoticeItem[]>([]);
+  const { notices, loading, handlers } = useNoticeSlice();
 
   // Form State
   const [titleEn, setTitleEn] = React.useState("");
@@ -48,61 +33,23 @@ export default function NoticesPage() {
   const [priority, setPriority] = React.useState<"NORMAL" | "HIGH" | "URGENT">("NORMAL");
   const [audience, setAudience] = React.useState("ALL");
 
-  const fetchNotices = React.useCallback(async () => {
-    try {
-      const data = await apiClient<NoticeItem[]>("/notices");
-      if (Array.isArray(data) && data.length > 0) {
-        setNotices(data);
-      }
-    } catch {
-      // Fallback
-    }
-  }, []);
-
-  React.useEffect(() => {
-    fetchNotices();
-  }, [fetchNotices]);
-
   const handlePublishNotice = async (e: React.FormEvent) => {
     e.preventDefault();
-    const payload = {
+    const success = await handlers.handleCreateNotice({
       titleEn,
       titleBn,
       bodyEn,
       bodyBn,
       priority,
       targetRoles: audience === "ALL" ? ["ALL", "STUDENT", "PARENT", "TEACHER"] : [audience],
-    };
+    });
 
-    try {
-      const created = await apiClient<NoticeItem>("/notices", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
-
-      setNotices((prev) => [created || {
-        ...payload,
-        id: `not-${Date.now()}`,
-        publishedAt: new Date().toISOString(),
-        status: "PUBLISHED",
-      }, ...prev]);
+    if (success) {
       setModalOpen(false);
       setTitleEn("");
       setTitleBn("");
       setBodyEn("");
       setBodyBn("");
-
-      toast({
-        title: "Circular Published Successfully 📢",
-        description: `Bilingual circular indexed in notice.notice table. Outbox event dispatched for push & portal feed.`,
-        type: "success",
-      });
-    } catch (err: any) {
-      toast({
-        title: "Publishing Failed",
-        description: err.message,
-        type: "error",
-      });
     }
   };
 

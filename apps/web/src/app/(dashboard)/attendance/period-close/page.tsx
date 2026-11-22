@@ -14,64 +14,19 @@ import {
   TableHead,
   TableCell,
 } from "@/components/ui/table";
-import { apiClient } from "@/lib/api-client";
+import { useAttendanceSlice } from "@/slicer";
 import { Lock, Unlock, CheckCircle2, ShieldCheck, FileCheck, AlertTriangle } from "lucide-react";
-
-interface PeriodCloseItem {
-  id: string;
-  sectionId: string;
-  sectionName: string;
-  month: string;
-  status: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "LOCKED";
-  totalDays: number;
-  presentRate: number;
-  submittedBy: string;
-  approvedBy: string | null;
-  approvedAt: string | null;
-}
 
 export default function PeriodClosePage() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [periodCloses, setPeriodCloses] = React.useState<PeriodCloseItem[]>([]);
+  const { periodCloses, loadingCloses, handlers } = useAttendanceSlice();
   const [isLoading, setIsLoading] = React.useState(false);
-
-  const fetchCloses = React.useCallback(async () => {
-    try {
-      const data = await apiClient<PeriodCloseItem[]>("/attendance/close");
-      if (Array.isArray(data) && data.length > 0) {
-        setPeriodCloses(data);
-      }
-    } catch {
-      // Fallback
-    }
-  }, []);
-
-  React.useEffect(() => {
-    fetchCloses();
-  }, [fetchCloses]);
 
   const handleApprove = async (closeId: string) => {
     setIsLoading(true);
     try {
-      await apiClient(`/attendance/close/${closeId}/approve`, {
-        method: "POST",
-      }).catch(() => null);
-
-      const approverName = user?.name || "Dr. Rafiqul Islam (Principal)";
-      setPeriodCloses((prev) =>
-        prev.map((pc) =>
-          pc.id === closeId
-            ? { ...pc, status: "LOCKED", approvedBy: approverName, approvedAt: new Date().toISOString() }
-            : pc
-        )
-      );
-
-      toast({
-        title: "Period Close APPROVED & LOCKED 🔒",
-        description: `Section snapshot locked by ${approverName}. maker_neq_checker constraint verified. Payroll calculation unblocked!`,
-        type: "success",
-      });
+      await handlers.handleApprovePeriodClose(closeId);
     } finally {
       setIsLoading(false);
     }

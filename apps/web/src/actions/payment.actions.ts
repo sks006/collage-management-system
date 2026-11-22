@@ -1,10 +1,7 @@
 "use server";
 
-import { apiClient } from "@/lib/api-client";
+import { financeService } from "@/services/finance.service";
 
 export async function initiatePaymentAction(invoiceId: string, method: string) {
-  return apiClient("/finance/payments/initiate", {
-    method: "POST",
-    body: JSON.stringify({ invoiceId, method }),
-  });
+  return financeService.initiatePayment(invoiceId, method);
 }

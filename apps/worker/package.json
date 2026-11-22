@@ -15,12 +15,16 @@
     "@sms/database": "workspace:*",
     "@sms/shared": "workspace:*",
     "drizzle-orm": "^0.38.2",
+    "nodemailer": "^10.6.1",
+    "pdfkit": "^0.21.0",
     "pg": "^8.13.1",
     "pino": "^9.5.0"
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.0",
     "@types/node": "^22.10.1",
+    "@types/nodemailer": "^8.0.2",
+    "@types/pdfkit": "^0.17.7",
     "@types/pg": "^8.11.10",
     "typescript": "^5.7.2"
   }

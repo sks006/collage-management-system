@@ -114,10 +114,16 @@ export class OutboxConsumer implements OnModuleInit, OnModuleDestroy {
       case "SEND_RECEIPT":
       case "GENERATE_PDF":
         return this.pdfProcessor.generateReceipt(payload);
+      case "GENERATE_PAYSLIP":
+        return this.pdfProcessor.generatePayslip(payload);
+      case "GENERATE_ID_CARD":
+        return this.pdfProcessor.generateStudentIdCard(payload);
       case "DISPATCH_PAYROLL":
         return this.beftnProcessor.generateBeftnFile(payload);
       case "COMPUTE_PAYROLL":
         return this.payrollProcessor.computePayroll(payload);
+      case "RECONCILE_PAYMENT":
+        return this.reconcileProcessor.reconcilePayment(payload);
       case "RECONCILE_PAYMENTS":
         return this.reconcileProcessor.reconcile5Min();
       default:

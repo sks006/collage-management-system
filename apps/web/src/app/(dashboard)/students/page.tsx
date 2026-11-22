@@ -16,30 +16,16 @@ import {
   TableHead,
   TableCell,
 } from "@/components/ui/table";
-import { apiClient } from "@/lib/api-client";
+import { useStudentSlice, StudentItem } from "@/slicer";
 import { Search, UserPlus, Upload, Phone, CheckCircle2 } from "lucide-react";
-
-interface StudentItem {
-  id: string;
-  admissionNo: string;
-  nameEn: string;
-  nameBn: string;
-  class: string;
-  section: string;
-  status: "ACTIVE" | "INACTIVE";
-  phone: string;
-  email?: string;
-}
 
 export default function StudentsPage() {
   const { toast } = useToast();
-  const [searchTerm, setSearchTerm] = React.useState("");
   const [addModalOpen, setAddModalOpen] = React.useState(false);
   const [importModalOpen, setImportModalOpen] = React.useState(false);
   const [isImporting, setIsImporting] = React.useState(false);
-  const [loading, setLoading] = React.useState(true);
 
-  const [students, setStudents] = React.useState<StudentItem[]>([]);
+  const { students, allCount, loading, searchTerm, handlers } = useStudentSlice();
 
   // Form State
   const [nameEn, setNameEn] = React.useState("");
@@ -49,93 +35,32 @@ export default function StudentsPage() {
   const [selectedSection, setSelectedSection] = React.useState("Section A (Padma)");
   const [phone, setPhone] = React.useState("+88017");
 
-  const fetchStudents = React.useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await apiClient<StudentItem[]>("/students");
-      if (Array.isArray(data) && data.length > 0) {
-        setStudents(data);
-      }
-    } catch {
-      // Fallback
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  React.useEffect(() => {
-    fetchStudents();
-  }, [fetchStudents]);
-
-  const filteredStudents = students.filter((s) => {
-    const q = searchTerm.toLowerCase();
-    return (
-      (s.admissionNo || "").toLowerCase().includes(q) ||
-      (s.nameEn || "").toLowerCase().includes(q) ||
-      (s.nameBn || "").includes(q) ||
-      (s.phone || "").includes(q) ||
-      (s.class || "").toLowerCase().includes(q)
-    );
-  });
+  const filteredStudents = students;
 
   const handleAddStudent = async (e: React.FormEvent) => {
     e.preventDefault();
-    const payload = {
-      admissionNo: admissionNo || `DMC-2026-${String(students.length + 10).padStart(3, "0")}`,
+    const success = await handlers.handleEnrollStudent({
       nameEn,
       nameBn: nameBn || nameEn,
       class: selectedClass,
       section: selectedSection,
-      status: "ACTIVE" as const,
       phone,
-    };
+    });
 
-    try {
-      const created = await apiClient<StudentItem>("/students", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
-
-      setStudents((prev) => [created || { ...payload, id: String(Date.now()) }, ...prev]);
+    if (success) {
       setAddModalOpen(false);
       setNameEn("");
       setNameBn("");
       setAdmissionNo("");
-
-      toast({
-        title: "Student Registered Successfully",
-        description: `${payload.nameEn} registered under ${payload.admissionNo}. Enrolled in ${payload.class}.`,
-        type: "success",
-      });
-    } catch (err: any) {
-      toast({
-        title: "Registration Failed",
-        description: err.message || "Failed to create student record in database.",
-        type: "error",
-      });
     }
   };
 
   const handleSimulateCsvImport = async () => {
     setIsImporting(true);
     try {
-      const batchData = [
-        { admissionNo: "DMC-2026-050", nameEn: "Rahat Chowdhury", nameBn: "রাহাত চৌধুরী", class: "Class 11 (Science)", section: "Section A (Padma)", status: "ACTIVE", phone: "+8801711889900" },
-        { admissionNo: "DMC-2026-051", nameEn: "Samira Khan", nameBn: "সামিরা খান", class: "Class 11 (Commerce)", section: "Section B (Meghna)", status: "ACTIVE", phone: "+8801811889900" },
-      ];
-
-      for (const item of batchData) {
-        await apiClient("/students", { method: "POST", body: JSON.stringify(item) }).catch(() => null);
-      }
-
-      await fetchStudents();
+      const mockCsv = "nameEn,phone,class,section\nRahat Chowdhury,+8801711889900,Class 11 (Science),Section A (Padma)\nSamira Khan,+8801811889900,Class 11 (Commerce),Section B (Meghna)";
+      await handlers.handleImportCsv(mockCsv);
       setImportModalOpen(false);
-
-      toast({
-        title: "CSV Bulk Import Completed",
-        description: "Successfully processed 2 student records into people.student schema. Audit log updated.",
-        type: "success",
-      });
     } finally {
       setIsImporting(false);
     }
@@ -208,7 +133,7 @@ export default function StudentsPage() {
                 placeholder="Search by name, ID (e.g. DMC-2026-001) or mobile..."
                 className="pl-8 h-9 text-xs"
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => handlers.handleSearch(e.target.value)}
               />
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">

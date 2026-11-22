@@ -15,6 +15,13 @@ import { createPayrollRunSchema } from "@sms/shared";
 export class PayrollController {
   constructor(private service: PayrollService) {}
 
+  @Get("runs")
+  @Roles("FINANCE", "ADMIN", "PRINCIPAL")
+  @ApiOperation({ summary: "List monthly payroll runs" })
+  async listRuns() {
+    return this.service.listRuns();
+  }
+
   @Post("runs")
   @Roles("FINANCE", "ADMIN")
   @ApiOperation({ summary: "Create draft monthly payroll run" })

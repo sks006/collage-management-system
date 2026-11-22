@@ -13,57 +13,29 @@ import {
   TableHead,
   TableCell,
 } from "@/components/ui/table";
-import { apiClient } from "@/lib/api-client";
+import { useAttendanceSlice } from "@/slicer";
 import { CheckCircle2, AlertCircle, Clock, Check, Send, Users, ShieldAlert } from "lucide-react";
-
-interface StudentRosterItem {
-  id: string;
-  roll: string;
-  name: string;
-  status: "PRESENT" | "ABSENT" | "LATE";
-}
-
-const INITIAL_ROSTERS: Record<string, StudentRosterItem[]> = {
-  "11-SCI-A": [
-    { id: "stu-1", roll: "101", name: "Tanvir Hasan (DMC-2026-001)", status: "PRESENT" },
-    { id: "stu-3", roll: "102", name: "Sadman Sakib (DMC-2026-003)", status: "PRESENT" },
-    { id: "stu-5", roll: "103", name: "Kazi Nabil (DMC-2026-005)", status: "LATE" },
-  ],
-  "11-SCI-B": [
-    { id: "stu-2", roll: "201", name: "Nusrat Jahan (DMC-2026-002)", status: "PRESENT" },
-    { id: "stu-6", roll: "202", name: "Sultana Razia (DMC-2026-006)", status: "PRESENT" },
-  ],
-  "12-HUM": [
-    { id: "stu-4", roll: "301", name: "Mehnaz Akter (DMC-2026-004)", status: "PRESENT" },
-  ],
-};
 
 export default function AttendancePage() {
   const { toast } = useToast();
-  const [selectedClass, setSelectedClass] = React.useState("11-SCI-A");
-  const [roster, setRoster] = React.useState<StudentRosterItem[]>(INITIAL_ROSTERS["11-SCI-A"]!);
-  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const { selectedClass, roster, isSubmitting, handlers } = useAttendanceSlice();
   const [submittedAt, setSubmittedAt] = React.useState<string | null>(null);
 
   const handleClassChange = (classKey: string) => {
-    setSelectedClass(classKey);
-    setRoster(INITIAL_ROSTERS[classKey] || []);
+    handlers.handleSelectClass(classKey);
     setSubmittedAt(null);
   };
 
   const toggleStatus = (id: string) => {
-    setRoster((prev) =>
-      prev.map((s) => {
-        if (s.id !== id) return s;
-        const nextStatus =
-          s.status === "PRESENT" ? "ABSENT" : s.status === "ABSENT" ? "LATE" : "PRESENT";
-        return { ...s, status: nextStatus };
-      }),
-    );
+    const student = roster.find((s) => s.id === id);
+    if (!student) return;
+    const nextStatus =
+      student.status === "PRESENT" ? "ABSENT" : student.status === "ABSENT" ? "LATE" : "PRESENT";
+    handlers.handleToggleStatus(id, nextStatus);
   };
 
   const markAll = (status: "PRESENT" | "ABSENT") => {
-    setRoster((prev) => prev.map((s) => ({ ...s, status })));
+    roster.forEach((s) => handlers.handleToggleStatus(s.id, status));
     toast({
       title: `Bulk Action Applied`,
       description: `Marked all students in section as ${status}.`,
@@ -77,35 +49,9 @@ export default function AttendancePage() {
   const attendanceRate = roster.length > 0 ? Math.round(((presentCount + lateCount) / roster.length) * 100) : 0;
 
   const handleSubmitBatch = async () => {
-    setIsSubmitting(true);
-    try {
-      const today = new Date().toISOString().split("T")[0];
-      const payload = {
-        sectionId: selectedClass,
-        eventDate: today,
-        period: 0,
-        events: roster.map((s) => ({
-          studentId: s.id,
-          status: s.status,
-          source: "MANUAL",
-        })),
-      };
-
-      await apiClient("/attendance/batch", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      }).catch(() => null);
-
-      const timestamp = new Date().toLocaleTimeString();
-      setSubmittedAt(timestamp);
-
-      toast({
-        title: "Attendance Batch Committed 🎯",
-        description: `Successfully inserted ${roster.length} events into attendance.period_event (partitioned table). ${absentCount} absentee SMS alerts queued via outbox.job.`,
-        type: "success",
-      });
-    } finally {
-      setIsSubmitting(false);
+    const success = await handlers.handleSubmitRoster();
+    if (success) {
+      setSubmittedAt(new Date().toLocaleTimeString());
     }
   };
 

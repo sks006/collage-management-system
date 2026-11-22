@@ -15,6 +15,12 @@ import { createLeaveRequestSchema, createCalendarDaySchema } from "@sms/shared";
 export class LeaveController {
   constructor(private service: LeaveService) {}
 
+  @Get("requests")
+  @ApiOperation({ summary: "List staff leave requests" })
+  async listRequests(@Query("staffId") staffId?: string) {
+    return this.service.getRequests(staffId);
+  }
+
   @Post("requests")
   @Roles("TEACHER", "OFFICE")
   @ApiOperation({ summary: "Staff submits leave application" })

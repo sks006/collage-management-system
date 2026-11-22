@@ -17,8 +17,8 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { apiClient } from "@/lib/api-client";
 import { formatBDT } from "@/lib/utils";
+import { useFinanceSlice, InvoiceItem, LedgerItem } from "@/slicer";
 import {
   CreditCard,
   Plus,
@@ -31,41 +31,9 @@ import {
   FileText,
 } from "lucide-react";
 
-interface InvoiceItem {
-  id: string;
-  studentId?: string;
-  studentName?: string;
-  student?: string;
-  admissionNo?: string;
-  month: string;
-  head?: string;
-  amount: number;
-  status: "PAID" | "ISSUED" | "PENDING" | "OVERDUE";
-  dueDate?: string;
-  paidAt?: string | null;
-  transactionId?: string | null;
-}
-
-interface LedgerItem {
-  id: string;
-  account: string;
-  partyType?: string;
-  partyName?: string;
-  party?: string;
-  amount: number;
-  currency?: string;
-  direction: "CREDIT" | "DEBIT";
-  source: string;
-  time?: string;
-  postedAt?: string;
-  status: "POSTED" | "REVERSED";
-}
-
 export default function FinancePage() {
   const { toast } = useToast();
-  const [invoices, setInvoices] = React.useState<InvoiceItem[]>([]);
-  const [ledger, setLedger] = React.useState<LedgerItem[]>([]);
-  const [loading, setLoading] = React.useState(true);
+  const { invoices, ledger, loading, handlers } = useFinanceSlice();
 
   const [selectedInvoice, setSelectedInvoice] = React.useState<InvoiceItem | null>(null);
   const [payModalOpen, setPayModalOpen] = React.useState(false);
@@ -78,31 +46,6 @@ export default function FinancePage() {
   const [newFeeAmount, setNewFeeAmount] = React.useState("");
   const [newFeeClass, setNewFeeClass] = React.useState("Class 11 (Science)");
 
-  const fetchFinanceData = React.useCallback(async () => {
-    setLoading(true);
-    try {
-      const [invData, legData] = await Promise.all([
-        apiClient<InvoiceItem[]>("/finance/invoices").catch(() => []),
-        apiClient<LedgerItem[]>("/finance/ledger").catch(() => []),
-      ]);
-
-      if (Array.isArray(invData) && invData.length > 0) {
-        setInvoices(invData);
-      }
-      if (Array.isArray(legData) && legData.length > 0) {
-        setLedger(legData);
-      }
-    } catch {
-      // Fallback
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  React.useEffect(() => {
-    fetchFinanceData();
-  }, [fetchFinanceData]);
-
   const handlePayInvoice = (inv: InvoiceItem) => {
     setSelectedInvoice(inv);
     setPayModalOpen(true);
@@ -111,48 +54,14 @@ export default function FinancePage() {
   const handleConfirmPayment = async () => {
     if (!selectedInvoice) return;
 
-    const newTxId = `TXN-${selectedMfs.toUpperCase()}-${Math.floor(100000 + Math.random() * 900000)}`;
-
-    // Update in UI
-    setInvoices((prev) =>
-      prev.map((i) =>
-        i.id === selectedInvoice.id
-          ? { ...i, status: "PAID", transactionId: newTxId, paidAt: new Date().toISOString() }
-          : i,
-      ),
-    );
-
-    // Append to Ledger
-    const newEntry: LedgerItem = {
-      id: `led-${Date.now()}`,
-      account: "STUDENT_FEES",
-      partyName: selectedInvoice.studentName || selectedInvoice.student || "Enrolled Student",
-      amount: selectedInvoice.amount,
-      direction: "CREDIT",
-      source: `IPN_WEBHOOK (${selectedMfs})`,
-      postedAt: new Date().toISOString(),
-      status: "POSTED",
-    };
-    setLedger((prev) => [newEntry, ...prev]);
+    await handlers.handleInitiatePayment(selectedInvoice.id, selectedMfs);
     setPayModalOpen(false);
-
-    toast({
-      title: "Payment Received & Posted to Ledger",
-      description: `${formatBDT(selectedInvoice.amount)} collected via ${selectedMfs}. Immutable Tx: ${newTxId}. Digital receipt queued.`,
-      type: "success",
-    });
   };
 
   const handleGenerateInvoices = async () => {
     setIsGenerating(true);
     try {
-      await apiClient("/finance/invoices/bulk", {
-        method: "POST",
-        body: JSON.stringify({ month: "April 2026" }),
-      }).catch(() => null);
-
-      await fetchFinanceData();
-
+      await handlers.handleRefresh();
       toast({
         title: "Bulk Invoices Generated Successfully",
         description: `Created student invoices for next academic cycle. Idempotency keys enforced in PostgreSQL.`,

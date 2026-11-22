@@ -24,6 +24,10 @@ export class PayrollRepository {
     return row;
   }
 
+  async findAllRuns() {
+    return this.db.select().from(payrollRun).orderBy(payrollRun.month);
+  }
+
   async findLines(runId: string) {
     return this.db.select().from(payrollLine).where(eq(payrollLine.payrollRunId, runId));
   }

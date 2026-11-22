@@ -8,13 +8,13 @@ import { ZodValidationPipe } from "../../../shared/pipes/zod-validation.pipe";
 import { initiatePaymentSchema, ipnWebhookSchema } from "@sms/shared";
 
 @ApiTags("Finance: Payments")
-@ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller("finance/payments")
 export class PaymentController {
   constructor(private service: PaymentService) {}
 
   @Post("initiate")
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles("ADMIN", "OFFICE", "FINANCE")
   @ApiOperation({ summary: "Initiate fee payment via aggregator" })
   async initiatePayment(
@@ -29,5 +29,26 @@ export class PaymentController {
   @ApiOperation({ summary: "Aggregator IPN Webhook callback" })
   async handleIPN(@Body(new ZodValidationPipe(ipnWebhookSchema)) payload: any) {
     return this.service.processIPN(payload);
+  }
+
+  @Post("webhook/bkash")
+  @ApiOperation({ summary: "bKash IPN Webhook" })
+  async handleBkashWebhook(
+    @Body() body: any,
+    @Headers("x-signature") signature?: string,
+  ) {
+    return this.service.handleBkashWebhook(body, signature);
+  }
+
+  @Post("webhook/nagad")
+  @ApiOperation({ summary: "Nagad Payment Gateway Webhook" })
+  async handleNagadWebhook(@Body() body: any) {
+    return this.service.handleNagadWebhook(body);
+  }
+
+  @Post("webhook/sslcommerz")
+  @ApiOperation({ summary: "SSLCommerz IPN Webhook" })
+  async handleSslCommerzWebhook(@Body() body: any) {
+    return this.service.handleSslCommerzWebhook(body);
   }
 }

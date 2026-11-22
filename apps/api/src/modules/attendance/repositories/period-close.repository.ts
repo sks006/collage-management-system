@@ -29,6 +29,10 @@ export class PeriodCloseRepository {
     return row;
   }
 
+  async findAll() {
+    return this.db.select().from(periodClose).orderBy(periodClose.month);
+  }
+
   async approve(id: string, approverId: string) {
     const [row] = await this.db
       .update(periodClose)

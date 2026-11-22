@@ -48,6 +48,10 @@ export class PayrollService {
     return this.repo.findLines(runId);
   }
 
+  async listRuns() {
+    return this.repo.findAllRuns();
+  }
+
   async retryFailedLine(lineId: string, actorId: string, actorRole: string) {
     // Retries an individual failed bank line in the outbox
     await this.outbox.publish("RETRY_PAYROLL_LINE", { lineId }, `retry_payline_${lineId}`);

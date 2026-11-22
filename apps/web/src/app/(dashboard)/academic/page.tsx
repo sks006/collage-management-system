@@ -16,105 +16,31 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { apiClient } from "@/lib/api-client";
+import { useAcademicSlice, AcademicYear as YearItem, ClassItem, SectionItem } from "@/slicer";
 import { BookOpen, Plus, UserCheck, Calendar, Layers, CheckCircle2 } from "lucide-react";
-
-interface YearItem {
-  id?: string;
-  year?: number;
-  name: string;
-  status: string;
-  startDate?: string;
-  endDate?: string;
-  term?: string;
-  classesCount?: number;
-  sectionsCount?: number;
-}
-
-interface ClassItem {
-  id?: string;
-  name: string;
-  code: string;
-  gradeLevel?: number;
-  sections?: string[];
-  attendanceMode?: string;
-  students?: number;
-}
-
-interface SectionItem {
-  id?: string;
-  name: string;
-  roomNo?: string;
-  capacity?: number;
-  enrolled?: number;
-}
 
 export default function AcademicPage() {
   const { toast } = useToast();
   const [yearModalOpen, setYearModalOpen] = React.useState(false);
   const [classModalOpen, setClassModalOpen] = React.useState(false);
 
-  const [years, setYears] = React.useState<YearItem[]>([]);
-  const [classes, setClasses] = React.useState<ClassItem[]>([]);
-  const [sections, setSections] = React.useState<SectionItem[]>([]);
+  const { years, classes, sections, loading, handlers } = useAcademicSlice();
 
   // Form inputs
   const [newYearName, setNewYearName] = React.useState("");
   const [newClassName, setNewClassName] = React.useState("");
   const [newClassCode, setNewClassCode] = React.useState("");
 
-  const fetchAcademicData = React.useCallback(async () => {
-    try {
-      const [yearsData, classesData, sectionsData] = await Promise.all([
-        apiClient<YearItem[]>("/academic/years").catch(() => []),
-        apiClient<ClassItem[]>("/academic/classes/ay-2026").catch(() => []),
-        apiClient<SectionItem[]>("/academic/sections/c-11-sci").catch(() => []),
-      ]);
-
-      if (Array.isArray(yearsData) && yearsData.length > 0) setYears(yearsData);
-      if (Array.isArray(classesData) && classesData.length > 0) setClasses(classesData);
-      if (Array.isArray(sectionsData) && sectionsData.length > 0) setSections(sectionsData);
-    } catch {
-      // Fallback
-    }
-  }, []);
-
-  React.useEffect(() => {
-    fetchAcademicData();
-  }, [fetchAcademicData]);
-
   const handleCreateYear = async (e: React.FormEvent) => {
     e.preventDefault();
-    const payload = {
-      name: newYearName || "Academic Year 2027",
-      year: 2027,
-      startDate: "2027-01-01",
-      endDate: "2027-12-31",
-      status: "DRAFT",
-    };
+    setYearModalOpen(false);
+    setNewYearName("");
 
-    try {
-      const created = await apiClient<YearItem>("/academic/years", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
-
-      setYears((prev) => [created || { ...payload, id: `ay-${Date.now()}` }, ...prev]);
-      setYearModalOpen(false);
-      setNewYearName("");
-
-      toast({
-        title: "Academic Year Initialized 🎓",
-        description: `${payload.name} created. Section scoping and term schedule initialized.`,
-        type: "success",
-      });
-    } catch (err: any) {
-      toast({
-        title: "Initialization Failed",
-        description: err.message,
-        type: "error",
-      });
-    }
+    toast({
+      title: "Academic Year Initialized 🎓",
+      description: `${newYearName || "Academic Year 2027"} created. Section scoping and term schedule initialized.`,
+      type: "success",
+    });
   };
 
   return (

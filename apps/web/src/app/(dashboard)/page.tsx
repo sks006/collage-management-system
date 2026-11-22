@@ -6,8 +6,8 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/lib/auth-context";
-import { useToast } from "@/components/ui/toast";
 import { formatBDT } from "@/lib/utils";
+import { useDashboardSlice } from "@/slicer";
 import {
   Users,
   CheckCircle2,
@@ -26,90 +26,12 @@ import {
   KeyRound,
 } from "lucide-react";
 
-interface RoleRequestItem {
-  id: string;
-  email: string;
-  fullName: string;
-  requestedRole: string;
-  referenceNo?: string;
-  status: string;
-  createdAt: string;
-}
-
 export default function DashboardPage() {
   const { user } = useAuth();
-  const { toast } = useToast();
   const role = user?.roles[0] || "ADMIN";
   const isAdminOrPrincipal = role === "ADMIN" || role === "PRINCIPAL";
 
-  const [roleRequests, setRoleRequests] = React.useState<RoleRequestItem[]>([]);
-  const [loadingRequests, setLoadingRequests] = React.useState(false);
-
-  React.useEffect(() => {
-    if (!isAdminOrPrincipal) return;
-    const fetchRequests = async () => {
-      setLoadingRequests(true);
-      try {
-        const res = await fetch("/api/v1/auth/role-requests");
-        const json = await res.json();
-        if (json.data) {
-          setRoleRequests(json.data);
-        }
-      } catch {
-        // Fallback
-      } finally {
-        setLoadingRequests(false);
-      }
-    };
-    fetchRequests();
-  }, [isAdminOrPrincipal]);
-
-  const handleApprove = async (id: string, name: string, roleName: string) => {
-    try {
-      const res = await fetch(`/api/v1/auth/role-requests/${id}/approve`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-      });
-      if (res.ok) {
-        setRoleRequests((prev) => prev.filter((r) => r.id !== id));
-        toast({
-          title: "Staff Role Approved",
-          description: `Granted ${roleName} permissions to ${name}. Activation notice dispatched.`,
-          type: "success",
-        });
-      }
-    } catch {
-      toast({
-        title: "Approval Failed",
-        description: "Could not approve role request.",
-        type: "error",
-      });
-    }
-  };
-
-  const handleReject = async (id: string, name: string) => {
-    try {
-      const res = await fetch(`/api/v1/auth/role-requests/${id}/reject`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-      });
-      if (res.ok) {
-        setRoleRequests((prev) => prev.filter((r) => r.id !== id));
-        toast({
-          title: "Role Request Rejected",
-          description: `Declined staff access for ${name}.`,
-          type: "info",
-        });
-      }
-    } catch {
-      toast({
-        title: "Rejection Failed",
-        description: "Could not reject role request.",
-        type: "error",
-      });
-    }
-  };
+  const { roleRequests, loadingRequests, handlers } = useDashboardSlice(isAdminOrPrincipal);
 
   return (
     <div className="space-y-8">
@@ -345,7 +267,7 @@ export default function DashboardPage() {
                       size="sm"
                       variant="outline"
                       className="h-8 text-xs text-destructive hover:bg-destructive/10"
-                      onClick={() => handleReject(req.id, req.fullName)}
+                      onClick={() => handlers.handleRejectRoleRequest(req.id, req.fullName)}
                     >
                       <XCircle className="h-3.5 w-3.5 mr-1" />
                       Reject
@@ -353,7 +275,7 @@ export default function DashboardPage() {
                     <Button
                       size="sm"
                       className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
-                      onClick={() => handleApprove(req.id, req.fullName, req.requestedRole)}
+                      onClick={() => handlers.handleApproveRoleRequest(req.id, req.fullName, req.requestedRole)}
                     >
                       <UserCheck className="h-3.5 w-3.5 mr-1" />
                       Approve {req.requestedRole}

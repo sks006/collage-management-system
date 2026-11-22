@@ -1,10 +1,11 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Inject } from "@nestjs/common";
 import { DatabaseInstance, academicYear, term, classTable, section, subject, teacherSection } from "@sms/database";
+import { DATABASE_CONNECTION } from "../../../shared/database/database.provider";
 import { eq, and } from "drizzle-orm";
 
 @Injectable()
 export class AcademicRepository {
-  constructor(private db: DatabaseInstance) {}
+  constructor(@Inject(DATABASE_CONNECTION) private db: DatabaseInstance) {}
 
   async findYears() {
     return this.db.select().from(academicYear).orderBy(academicYear.startDate);
@@ -29,8 +30,11 @@ export class AcademicRepository {
     return row;
   }
 
-  async findClasses(yearId: string) {
-    return this.db.select().from(classTable).where(eq(classTable.academicYearId, yearId));
+  async findClasses(yearId?: string) {
+    if (yearId) {
+      return this.db.select().from(classTable).where(eq(classTable.academicYearId, yearId));
+    }
+    return this.db.select().from(classTable);
   }
 
   async createClass(data: typeof classTable.$inferInsert) {
@@ -38,8 +42,11 @@ export class AcademicRepository {
     return row;
   }
 
-  async findSections(classId: string) {
-    return this.db.select().from(section).where(eq(section.classId, classId));
+  async findSections(classId?: string) {
+    if (classId) {
+      return this.db.select().from(section).where(eq(section.classId, classId));
+    }
+    return this.db.select().from(section);
   }
 
   async createSection(data: typeof section.$inferInsert) {

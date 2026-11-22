@@ -39,6 +39,12 @@ export default function LoginPage() {
         description: `Welcome back to Dhaka Model College Institutional Portal.`,
         type: "success",
       });
+    } catch (err: any) {
+      toast({
+        title: "Login Failed",
+        description: err.message || "Invalid credentials. Please verify your email and password.",
+        type: "error",
+      });
     } finally {
       setIsLoading(false);
     }

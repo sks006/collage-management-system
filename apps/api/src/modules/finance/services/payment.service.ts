@@ -45,6 +45,69 @@ export class PaymentService {
     return { paymentId: created.id, tranId, redirectUrl };
   }
 
+  async handleBkashWebhook(body: any, signature?: string) {
+    const tranId = body.trxID || body.tran_id || `BKASH_${Date.now()}`;
+    const invoiceId = body.invoiceId || body.merchantInvoiceNumber;
+    const amount = Number(body.amount);
+
+    await this.outbox.publish(
+      "RECONCILE_PAYMENT",
+      {
+        tranId,
+        invoiceId,
+        amount,
+        method: "BKASH",
+        status: "COMPLETED",
+        gatewayPayload: body,
+      },
+      `reconcile_bkash_${tranId}`,
+    );
+
+    return { statusCode: "0000", statusMessage: "Successful", tranId };
+  }
+
+  async handleNagadWebhook(body: any) {
+    const tranId = body.payment_ref_id || body.tran_id || `NAGAD_${Date.now()}`;
+    const invoiceId = body.order_id || body.invoiceId;
+    const amount = Number(body.amount);
+
+    await this.outbox.publish(
+      "RECONCILE_PAYMENT",
+      {
+        tranId,
+        invoiceId,
+        amount,
+        method: "NAGAD",
+        status: "COMPLETED",
+        gatewayPayload: body,
+      },
+      `reconcile_nagad_${tranId}`,
+    );
+
+    return { status: "Success", tranId };
+  }
+
+  async handleSslCommerzWebhook(body: any) {
+    const tranId = body.tran_id || `SSL_${Date.now()}`;
+    const invoiceId = body.value_a || body.invoiceId;
+    const amount = Number(body.amount);
+
+    await this.outbox.publish(
+      "RECONCILE_PAYMENT",
+      {
+        tranId,
+        invoiceId,
+        amount,
+        method: "SSLCOMMERZ",
+        status: "COMPLETED",
+        gatewayPayload: body,
+      },
+      `reconcile_ssl_${tranId}`,
+    );
+
+    return { status: "VALIDATED", tranId };
+  }
+
   // Section 6.2 IPN Webhook validation & Append-only ledger posting
   async processIPN(payload: any) {
     const tranId = payload.tran_id;

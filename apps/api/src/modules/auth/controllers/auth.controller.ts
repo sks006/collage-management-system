@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Param,
+  Patch,
   Post,
   Query,
   Req,
@@ -15,6 +16,7 @@ import {
   VerifyOtpDto,
   LoginDto,
   CallbackDto,
+  DecideRoleRequestDto,
 } from '../services/auth.service';
 import { JwtAuthGuard } from '../../../shared/guards/jwt.guard';
 import { RolesGuard } from '../../../shared/guards/roles.guard';
@@ -77,9 +79,12 @@ export class AuthController {
    */
   @Get('me')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  getProfile(@Req() req: any) {
+  async getProfile(@Req() req: any) {
+    const details = await this.authService.getMe(req.user);
     return {
       user: req.user,
+      profile: details.profile,
+      profileType: details.profileType,
       scope: req.rowScope,
     };
   }
@@ -95,7 +100,21 @@ export class AuthController {
   }
 
   /**
-   * Protected: 1-Click Role Request Approval
+   * Protected: Decide Role Request (Approve or Reject via PATCH)
+   */
+  @Patch('role-requests/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'PRINCIPAL')
+  decideRoleRequest(
+    @Param('id') id: string,
+    @Req() req: any,
+    @Body() dto: DecideRoleRequestDto,
+  ) {
+    return this.authService.decideRoleRequest(id, req.user, dto);
+  }
+
+  /**
+   * Protected: 1-Click Role Request Approval (Backward Compatibility)
    */
   @Post('role-requests/:id/approve')
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -105,17 +124,21 @@ export class AuthController {
     @Req() req: any,
     @Body() body: { roleOverride?: string },
   ) {
-    return this.authService.approveRoleRequest(id, req.user?.id, body?.roleOverride);
+    return this.authService.approveRoleRequest(id, req.user?.id || req.user?.sub, body?.roleOverride);
   }
 
   /**
-   * Protected: Role Request Rejection
+   * Protected: Role Request Rejection (Backward Compatibility)
    */
   @Post('role-requests/:id/reject')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'PRINCIPAL')
-  rejectRoleRequest(@Param('id') id: string, @Req() req: any) {
-    return this.authService.rejectRoleRequest(id, req.user?.id);
+  rejectRoleRequest(
+    @Param('id') id: string,
+    @Req() req: any,
+    @Body() body: { reason?: string },
+  ) {
+    return this.authService.rejectRoleRequest(id, req.user?.id || req.user?.sub, body?.reason);
   }
 
   /**

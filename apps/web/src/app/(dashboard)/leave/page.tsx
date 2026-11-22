@@ -16,33 +16,14 @@ import {
   TableHead,
   TableCell,
 } from "@/components/ui/table";
-import { apiClient } from "@/lib/api-client";
+import { useLeaveSlice, LeaveRequestItem } from "@/slicer";
 import { CalendarPlus, Check, X, Clock, CalendarDays } from "lucide-react";
-
-interface LeaveRequestItem {
-  id: string;
-  staffId?: string;
-  staffName?: string;
-  applicant?: string;
-  designation?: string;
-  leaveType?: string;
-  type?: string;
-  startDate?: string;
-  from?: string;
-  endDate?: string;
-  to?: string;
-  days: number;
-  reason: string;
-  status: "PENDING" | "APPROVED" | "REJECTED";
-  approvedBy?: string | null;
-  approver?: string;
-}
 
 export default function LeavePage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [modalOpen, setModalOpen] = React.useState(false);
-  const [requests, setRequests] = React.useState<LeaveRequestItem[]>([]);
+  const { requests, loading, handlers } = useLeaveSlice();
 
   // Form State
   const [leaveType, setLeaveType] = React.useState("CASUAL");
@@ -50,86 +31,24 @@ export default function LeavePage() {
   const [endDate, setEndDate] = React.useState("2026-04-12");
   const [reason, setReason] = React.useState("");
 
-  const fetchLeave = React.useCallback(async () => {
-    try {
-      const data = await apiClient<LeaveRequestItem[]>("/leave/requests");
-      if (Array.isArray(data) && data.length > 0) {
-        setRequests(data);
-      }
-    } catch {
-      // Fallback
-    }
-  }, []);
-
-  React.useEffect(() => {
-    fetchLeave();
-  }, [fetchLeave]);
-
   const handleApplyLeave = async (e: React.FormEvent) => {
     e.preventDefault();
-    const payload = {
-      staffId: user?.id || "stf-2",
-      staffName: user?.name || "Faculty Member",
-      designation: user?.roles[0] || "Staff",
+    const success = await handlers.handleApplyLeave({
       leaveType,
-      startDate,
-      endDate,
+      from: startDate,
+      to: endDate,
       days: 3,
       reason: reason || "Personal grounds",
-    };
+    });
 
-    try {
-      const created = await apiClient<LeaveRequestItem>("/leave/requests", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
-
-      setRequests((prev) => [created || {
-        ...payload,
-        id: `lv-${Date.now()}`,
-        status: "PENDING",
-      }, ...prev]);
+    if (success) {
       setModalOpen(false);
       setReason("");
-
-      toast({
-        title: "Leave Application Submitted",
-        description: `Applied for ${leaveType} leave from ${startDate} to ${endDate}. Sent to Principal for approval.`,
-        type: "success",
-      });
-    } catch (err: any) {
-      toast({
-        title: "Application Failed",
-        description: err.message || "Failed to submit leave application.",
-        type: "error",
-      });
     }
   };
 
   const handleApprove = async (id: string) => {
-    try {
-      await apiClient(`/leave/requests/${id}/approve`, {
-        method: "POST",
-      }).catch(() => null);
-
-      setRequests((prev) =>
-        prev.map((r) =>
-          r.id === id ? { ...r, status: "APPROVED", approvedBy: user?.name || "Principal" } : r,
-        ),
-      );
-
-      toast({
-        title: "Leave Request Approved",
-        description: "Staff quota updated and calendar substitution logged.",
-        type: "success",
-      });
-    } catch (err: any) {
-      toast({
-        title: "Approval Failed",
-        description: err.message,
-        type: "error",
-      });
-    }
+    await handlers.handleApproveLeave(id);
   };
 
   return (

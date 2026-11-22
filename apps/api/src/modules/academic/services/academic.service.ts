@@ -23,7 +23,7 @@ export class AcademicService {
     return row;
   }
 
-  async listClasses(yearId: string) {
+  async listClasses(yearId?: string) {
     return this.repo.findClasses(yearId);
   }
 
@@ -32,7 +32,7 @@ export class AcademicService {
     return row;
   }
 
-  async listSections(classId: string) {
+  async listSections(classId?: string) {
     return this.repo.findSections(classId);
   }
 

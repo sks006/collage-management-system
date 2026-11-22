@@ -47,6 +47,10 @@ export class LeaveService {
     return this.repo.findSubstitutions(staffId);
   }
 
+  async getRequests(staffId?: string) {
+    return this.repo.findRequests(staffId);
+  }
+
   async getCalendar(yearId: string) {
     return this.repo.getCalendarDays(yearId);
   }

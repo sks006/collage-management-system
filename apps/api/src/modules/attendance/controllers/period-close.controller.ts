@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Param, UseGuards } from "@nestjs/common";
+import { Controller, Get, Post, Body, Param, UseGuards } from "@nestjs/common";
 import { ApiTags, ApiBearerAuth, ApiOperation } from "@nestjs/swagger";
 import { PeriodCloseService } from "../services/period-close.service";
 import { JwtAuthGuard } from "../../../shared/guards/jwt.guard";
@@ -14,6 +14,12 @@ import { periodCloseSchema } from "@sms/shared";
 @Controller("attendance/close")
 export class PeriodCloseController {
   constructor(private service: PeriodCloseService) {}
+
+  @Get()
+  @ApiOperation({ summary: "List period close records" })
+  async list() {
+    return this.service.list();
+  }
 
   @Post()
   @Roles("ADMIN", "PRINCIPAL", "OFFICE")

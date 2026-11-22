@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import { authService } from "@/services/auth.service";
 
 export interface UserSession {
   id: string;
@@ -60,6 +61,7 @@ interface AuthContextValue {
   user: UserSession | null;
   token: string | null;
   isAuthenticated: boolean;
+  isLoading: boolean;
   login: (email: string, password?: string, role?: string) => Promise<void>;
   loginWithKeycloak: () => void;
   signup: (userData: { name: string; email: string; role: string; phone?: string }) => Promise<void>;
@@ -84,27 +86,83 @@ const STORAGE_KEY = "sms_active_user";
 const TOKEN_KEY = "sms_access_token";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = React.useState<UserSession | null>(DEMO_PERSONAS["ADMIN"]!);
+  // Initialize user to NULL strictly as required by specification
+  const [user, setUser] = React.useState<UserSession | null>(null);
   const [token, setToken] = React.useState<string | null>(null);
-  const [mounted, setMounted] = React.useState(false);
+  const [isLoading, setIsLoading] = React.useState(true);
   const router = useRouter();
 
-  React.useEffect(() => {
-    setMounted(true);
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      const storedToken = localStorage.getItem(TOKEN_KEY);
-      if (stored) {
-        setUser(JSON.parse(stored));
+  const setSession = React.useCallback((newUser: UserSession | null, accessToken?: string | null) => {
+    setUser(newUser);
+    if (typeof window !== "undefined") {
+      if (newUser) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(newUser));
       } else {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(DEMO_PERSONAS["ADMIN"]!));
+        localStorage.removeItem(STORAGE_KEY);
       }
-      if (storedToken) {
-        setToken(storedToken);
+      if (accessToken) {
+        localStorage.setItem(TOKEN_KEY, accessToken);
+        setToken(accessToken);
+      } else if (accessToken === null) {
+        localStorage.removeItem(TOKEN_KEY);
+        setToken(null);
       }
-    } catch {
-      // Fallback
     }
+  }, []);
+
+  // Hydrate user session from stored token & verify with live backend GET /api/v1/auth/me
+  React.useEffect(() => {
+    let isCancelled = false;
+
+    async function hydrate() {
+      try {
+        const storedToken = typeof window !== "undefined" ? localStorage.getItem(TOKEN_KEY) : null;
+        const storedUser = typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
+
+        if (storedToken) {
+          setToken(storedToken);
+          // Verify with live backend via single gateway
+          try {
+            const data = await authService.me();
+            if (!isCancelled && data) {
+              const u = data.user || data;
+              const liveUser: UserSession = {
+                id: u.id || u.sub || "user",
+                name: u.name || data.profile?.nameEn || u.email?.split("@")[0] || "User",
+                email: u.email || data.profile?.email || "",
+                roles: u.roles || (data.profile?.role ? [data.profile.role] : ["USER"]),
+                phone: data.profile?.phone,
+              };
+              setUser(liveUser);
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(liveUser));
+            }
+          } catch {
+            // Stored token is invalid or expired
+            if (!isCancelled) {
+              setUser(null);
+              setToken(null);
+              localStorage.removeItem(STORAGE_KEY);
+              localStorage.removeItem(TOKEN_KEY);
+            }
+          }
+        } else if (storedUser) {
+          try {
+            const parsed = JSON.parse(storedUser);
+            if (!isCancelled) setUser(parsed);
+          } catch {}
+        }
+      } catch (err) {
+        // Network or parse issue
+      } finally {
+        if (!isCancelled) setIsLoading(false);
+      }
+    }
+
+    hydrate();
+
+    return () => {
+      isCancelled = true;
+    };
   }, []);
 
   const loginWithKeycloak = React.useCallback(() => {
@@ -119,63 +177,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     window.location.href = authUrl;
   }, []);
 
-  const setSession = React.useCallback((newUser: UserSession, accessToken?: string) => {
-    setUser(newUser);
-    if (typeof window !== "undefined") {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(newUser));
-      if (accessToken) {
-        localStorage.setItem(TOKEN_KEY, accessToken);
-        setToken(accessToken);
+  const login = React.useCallback(
+    async (email: string, password?: string, role = "ADMIN") => {
+      const json = await authService.login({ email, password, requestedRole: role });
+
+      if (json.user && json.accessToken) {
+        setSession(json.user, json.accessToken);
+        router.push("/");
+        return;
       }
-    }
-  }, []);
 
-  const login = React.useCallback(async (email: string, password?: string, role = "ADMIN") => {
-    try {
-      const res = await fetch("/api/v1/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, requestedRole: role }),
-      });
-      if (res.ok) {
-        const json = await res.json();
-        if (json.user && json.accessToken) {
-          setSession(json.user, json.accessToken);
-          router.push("/");
-          return;
-        }
+      if (json.accessToken) {
+        const fallbackUser: UserSession = {
+          id: `usr-${Buffer.from(email).toString("base64").substring(0, 8)}`,
+          email,
+          name: email.split("@")[0],
+          roles: [role],
+        };
+        setSession(fallbackUser, json.accessToken);
+        router.push("/");
       }
-    } catch {
-      // Fallback to local session
-    }
+    },
+    [router, setSession],
+  );
 
-    const matched = Object.values(DEMO_PERSONAS).find(
-      (p) => p.email.toLowerCase() === email.toLowerCase(),
-    );
+  const signup = React.useCallback(
+    async (data: { name: string; email: string; role: string; phone?: string }) => {
+      const newUser: UserSession = {
+        id: Math.random().toString(36).substring(2, 10),
+        name: data.name,
+        email: data.email,
+        roles: [data.role],
+        phone: data.phone,
+      };
 
-    const newUser: UserSession = matched || {
-      id: Math.random().toString(36).substring(2, 10),
-      name: email.split("@")[0] || "User",
-      email,
-      roles: [role],
-    };
-
-    setSession(newUser);
-    router.push("/");
-  }, [router, setSession]);
-
-  const signup = React.useCallback(async (data: { name: string; email: string; role: string; phone?: string }) => {
-    const newUser: UserSession = {
-      id: Math.random().toString(36).substring(2, 10),
-      name: data.name,
-      email: data.email,
-      roles: [data.role],
-      phone: data.phone,
-    };
-
-    setSession(newUser);
-    router.push("/");
-  }, [router, setSession]);
+      setSession(newUser);
+      router.push("/");
+    },
+    [router, setSession],
+  );
 
   const registerUser = React.useCallback(
     async (data: {
@@ -186,47 +226,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       referenceNo?: string;
       phone?: string;
     }) => {
-      const res = await fetch("/api/v1/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      const json = await res.json();
-      if (!res.ok) {
-        throw new Error(json.error || json.message || "Failed to send verification code");
-      }
-      return json;
+      return authService.register(data);
     },
-    []
+    [],
   );
 
   const verifyUserOtp = React.useCallback(
     async (data: { email: string; otp: string }) => {
-      const res = await fetch("/api/v1/auth/verify-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      const json = await res.json();
-      if (!res.ok) {
-        throw new Error(json.error || json.message || "Invalid verification code");
+      const json = await authService.verifyOtp(data);
+      if (json.tokens?.accessToken && json.user) {
+        setSession(json.user, json.tokens.accessToken);
       }
       return json;
     },
-    []
+    [setSession],
   );
 
   const resendOtp = React.useCallback(async (email: string) => {
-    const res = await fetch("/api/v1/auth/resend-otp", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email }),
-    });
-    const json = await res.json();
-    if (!res.ok) {
-      throw new Error(json.error || json.message || "Failed to resend verification code");
-    }
-    return json;
+    return authService.resendOtp(email);
   }, []);
 
   const logout = React.useCallback(() => {
@@ -239,10 +256,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.push("/login");
   }, [router]);
 
-  const switchPersona = React.useCallback((roleKey: string) => {
-    const persona = DEMO_PERSONAS[roleKey] || DEMO_PERSONAS["ADMIN"]!;
-    setSession(persona);
-  }, [setSession]);
+  const switchPersona = React.useCallback(
+    (roleKey: string) => {
+      const persona = DEMO_PERSONAS[roleKey];
+      if (persona) {
+        setSession(persona, `jwt-demo-${roleKey.toLowerCase()}`);
+      }
+    },
+    [setSession],
+  );
 
   return (
     <AuthContext.Provider
@@ -250,6 +272,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         user,
         token,
         isAuthenticated: !!user,
+        isLoading,
         login,
         loginWithKeycloak,
         signup,
